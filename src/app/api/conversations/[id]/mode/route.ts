@@ -6,7 +6,7 @@ import { defaultModeReason } from '@/lib/repo/logic';
 
 // Pause (mode "human") or resume (mode "ai") the AI for ONE conversation.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer('ai.toggle');
   if (viewer instanceof NextResponse) return viewer;
   const { id } = await params;
   const parsed = SetModeSchema.safeParse(await req.json().catch(() => null));

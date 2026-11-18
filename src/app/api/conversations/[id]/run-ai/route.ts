@@ -6,7 +6,7 @@ import { isDemoMode } from '@/lib/config';
 // "Resume and let AI reply now": turns the AI back on and asks n8n to answer the
 // customer's latest message right away (n8n webhook "Run AI Now").
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer('ai.toggle');
   if (viewer instanceof NextResponse) return viewer;
   const { id } = await params;
   const repo = getRepo();

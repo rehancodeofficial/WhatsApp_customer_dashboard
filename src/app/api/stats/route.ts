@@ -3,7 +3,7 @@ import { requireViewer } from '@/lib/auth';
 import { getRepo } from '@/lib/repo';
 
 export async function GET() {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer('stats.view');
   if (viewer instanceof NextResponse) return viewer;
   return NextResponse.json({ stats: await getRepo().stats(viewer) });
 }

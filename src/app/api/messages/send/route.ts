@@ -9,7 +9,7 @@ import { rateLimit } from '@/lib/rate-limit';
 
 // The owner / agent replies to a customer from the dashboard.
 export async function POST(req: NextRequest) {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer('chats.reply');
   if (viewer instanceof NextResponse) return viewer;
   if (!rateLimit(`send:${viewer.id ?? 'demo'}`, 30, 60_000)) {
     return NextResponse.json({ error: 'Too many messages, wait a minute' }, { status: 429 });

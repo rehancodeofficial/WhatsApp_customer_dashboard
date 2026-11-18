@@ -2,12 +2,39 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { isDemoMode } from '@/lib/config';
 
-// Protects the dashboard pages and dashboard APIs with Supabase Auth.
-// n8n endpoints (/api/n8n/*) and the cron endpoint use their own shared secrets instead.
+const DEMO_COOKIE = 'pb_demo_session';
+
+// Sends signed-out visitors to /login. Role checks (Admin vs Management) happen in each API route.
+// n8n (/api/n8n/*), cron and login endpoints use their own checks.
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (isDemoMode()) return NextResponse.next();
-  if (pathname.startsWith('/api/n8n/') || pathname.startsWith('/api/cron/') || pathname.startsWith('/api/health')) {
+  if (
+    pathname.startsWith('/api/n8n/') ||
+    pathname.startsWith('/api/cron/') ||
+    pathname.startsWith('/api/health') ||
+    pathname.startsWith('/api/auth/')
+  ) {
+    return NextResponse.next();
+  }
+
+  const redirectToLogin = () => {
+    if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.search = pathname === '/' || pathname === '/dashboard' ? '' : `?next=${encodeURIComponent(pathname)}`;
+    return NextResponse.redirect(url);
+  };
+  const redirectToDashboard = () => {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    url.search = '';
+    return NextResponse.redirect(url);
+  };
+
+  if (isDemoMode()) {
+    // Signature is verified in the route handlers; here we only check that a session exists.
+    const has = !!request.cookies.get(DEMO_COOKIE)?.value;
+    if (!has && pathname !== '/login') return redirectToLogin();
     return NextResponse.next();
   }
 
@@ -24,26 +51,12 @@ export async function middleware(request: NextRequest) {
       },
     },
   });
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && pathname !== '/login') {
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
-    }
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    url.searchParams.set('next', pathname);
-    return NextResponse.redirect(url);
-  }
-  if (user && pathname === '/login') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    url.search = '';
-    return NextResponse.redirect(url);
-  }
+  if (!user && pathname !== '/login') return redirectToLogin();
+  if (user && pathname === '/login') return redirectToDashboard();
   return response;
 }
 

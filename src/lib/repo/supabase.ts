@@ -10,10 +10,9 @@ function flatten(row: any): Conversation {
   return { ...rest, contact: contacts ?? rest.contact };
 }
 
-/** Agents only see chats assigned to them or unassigned; owners see everything. */
-function scopeForViewer<T extends { or: (f: string) => T }>(q: T, viewer: Viewer): T {
-  if (viewer.role === 'owner' || !viewer.id) return q;
-  return q.or(`assigned_to.is.null,assigned_to.eq.${viewer.id}`);
+/** Admin and Management both see every customer chat (Management's job is the inbox). */
+function scopeForViewer<T>(q: T, _viewer: Viewer): T {
+  return q;
 }
 
 export class SupabaseRepo implements Repo {

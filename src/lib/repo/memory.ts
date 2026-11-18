@@ -118,8 +118,9 @@ export class MemoryRepo implements Repo {
     return { ...c, contact: store().contacts.find((x) => x.id === c.contact_id) };
   }
 
-  private visible(viewer: Viewer, c: Omit<Conversation, 'contact'>) {
-    return viewer.role === 'owner' || !viewer.id || !c.assigned_to || c.assigned_to === viewer.id;
+  // Admin and Management both see every customer chat.
+  private visible(_viewer: Viewer, _c: Omit<Conversation, 'contact'>) {
+    return true;
   }
 
   async listConversations(viewer: Viewer, f: ConversationFilters = {}) {
