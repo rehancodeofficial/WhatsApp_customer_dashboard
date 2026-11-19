@@ -169,17 +169,29 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                   <ShoppingCart className="w-3.5 h-3.5 text-slate-600" />
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-[11px] mt-1.5 text-slate-500">
-                <span className="text-emerald-600 font-medium">{paidOrdersList.length} paid</span>
-                <span>·</span>
-                <span className="text-amber-600 font-medium">{s.pendingOrders} pending</span>
-              </div>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">{num(s.orders)}</span>
-                <span className="text-[11px] text-slate-400 font-medium">total</span>
+                <span className="text-[11px] text-slate-400 font-medium">total orders</span>
+              </div>
+              {/* Separate lines for Completed and Pending */}
+              <div className="space-y-1 mt-3 pt-2.5 border-t border-slate-100 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Completed orders
+                  </span>
+                  <span className="font-semibold text-emerald-700 tabular-nums">{paidOrdersList.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Pending orders
+                  </span>
+                  <span className="font-semibold text-amber-700 tabular-nums">{s.pendingOrders}</span>
+                </div>
               </div>
             </div>
-            <div className="text-[11px] text-slate-400 mt-3">
+            <div className="text-[10px] text-slate-400 mt-2">
               this period
             </div>
           </div>
@@ -193,12 +205,34 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                   <Boxes className="w-3.5 h-3.5 text-slate-600" />
                 </span>
               </div>
-              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-2">
-                {inv ? money(inv.stockValueCost, undefined, true) : '—'}
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                  {inv ? money(inv.stockValueCost, undefined, true) : '—'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">{inv ? `${num(inv.units)} units` : ''}</span>
+              </div>
+              {/* Owner critical metrics under stock value: Low stock & Out of stock alerts */}
+              <div className="space-y-1 mt-3 pt-2.5 border-t border-slate-100 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                    Active catalog
+                  </span>
+                  <span className="font-semibold text-slate-700 tabular-nums">{inv ? `${inv.skus} SKUs` : '—'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <span className={cx("w-2 h-2 rounded-full", inv && (inv.lowStock.length > 0 || inv.outOfStock > 0) ? "bg-rose-500" : "bg-emerald-500")}></span>
+                    Attention needed
+                  </span>
+                  <span className="font-semibold tabular-nums text-rose-600">
+                    {inv ? (inv.lowStock.length === 0 && inv.outOfStock === 0 ? <span className="text-emerald-600">All healthy</span> : `${inv.lowStock.length} low · ${inv.outOfStock} out`) : '—'}
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="text-[11px] text-slate-400 mt-3">
-              {inv ? `${num(inv.units)} units` : 'no access'}
+            <div className="text-[10px] text-slate-400 mt-2">
+              live inventory
             </div>
           </div>
 
