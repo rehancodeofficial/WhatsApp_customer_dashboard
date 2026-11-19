@@ -12,13 +12,24 @@ export function SuppliersView({ perms }: { perms: Set<string> }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [country, setCountry] = useState('all');
+  const [brand, setBrand] = useState('all');
   const [edit, setEdit] = useState<Row | 'new' | null>(null);
   const canManage = perms.has('suppliers.manage');
   const load = useCallback(() => {
     api<{ suppliers: Row[] }>('/api/biz/suppliers').then((d) => setRows(d.suppliers)).catch((e) => setErr(e.message));
   }, []);
   useEffect(load, [load]);
-  const shown = (rows || []).filter((s) => !q || [s.name, s.company, s.country, ...s.brands].some((v) => v && v.toLowerCase().includes(q.toLowerCase())));
+
+  const countries = Array.from(new Set((rows || []).map((s) => s.country).filter(Boolean) as string[])).sort();
+  const brands = Array.from(new Set((rows || []).flatMap((s) => s.brands || []).filter(Boolean) as string[])).sort();
+
+  const shown = (rows || []).filter((s) => {
+    if (country !== 'all' && s.country !== country) return false;
+    if (brand !== 'all' && !s.brands?.includes(brand)) return false;
+    if (!q) return true;
+    return [s.name, s.company, s.country, ...(s.brands || [])].some((v) => v && v.toLowerCase().includes(q.toLowerCase()));
+  });
 
   return (
     <div className="h-full overflow-y-auto pr-1">
@@ -33,24 +44,47 @@ export function SuppliersView({ perms }: { perms: Set<string> }) {
         }
       />
       <ErrorNote text={err} />
-      {rows && rows.length > 0 && (
-        <div className="grid gap-4 lg:grid-cols-2 mb-4">
-          <Card>
-            <h3 className="text-[15px] font-semibold text-slate-800 mb-4">Units in stock by supplier</h3>
-            <BarList rows={rows.map((s) => ({ label: s.name, value: s.units, sub: `${s.skus} products` })).sort((a, b) => b.value - a.value)} format={num} />
-          </Card>
-          <Card>
-            <h3 className="text-[15px] font-semibold text-slate-800 mb-4">Suppliers by country</h3>
-            <BarList
-              rows={Array.from(rows.reduce((m, s) => m.set(s.country || 'Unknown', (m.get(s.country || 'Unknown') || 0) + 1), new Map<string, number>()), ([label, value]) => ({ label, value }))}
-              format={num}
-              tone="slate"
-            />
-          </Card>
-        </div>
-      )}
       <Card>
-        <div className="flex justify-end mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="text-xs rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-700 outline-none focus:border-slate-400"
+              aria-label="Filter by country"
+            >
+              <option value="all">All countries ({rows?.length || 0})</option>
+              {countries.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <select
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              className="text-xs rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-700 outline-none focus:border-slate-400"
+              aria-label="Filter by brand"
+            >
+              <option value="all">All brands</option>
+              {brands.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+
+            {(country !== 'all' || brand !== 'all' || q) && (
+              <button
+                onClick={() => {
+                  setCountry('all');
+                  setBrand('all');
+                  setQ('');
+                }}
+                className="text-xs text-slate-500 hover:text-slate-800 underline ml-1"
+              >
+                Reset filters
+              </button>
+            )}
+          </div>
+
           <SearchInput value={q} onChange={setQ} placeholder="Name, country, brand" />
         </div>
         {!rows ? (
