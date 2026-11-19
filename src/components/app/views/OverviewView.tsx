@@ -120,27 +120,43 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
             </div>
           </div>
 
-          {/* 2. Gross profit Card (Orange Highlight) */}
-          <div className="xl:col-span-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-5 text-white flex flex-col justify-between shadow-lg shadow-orange-500/20 min-h-[170px]">
-            <div>
+          {/* 2. Gross profit & Pending Payments (Stacked into 2 cards in height-wise, same width) */}
+          <div className="xl:col-span-3 flex flex-col gap-3 min-h-[170px] justify-between">
+            {/* 2A. Gross profit Card (Orange Highlight) */}
+            <div className="flex-1 bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 text-white flex flex-col justify-between shadow-md shadow-orange-500/20">
               <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm font-medium text-orange-100">Gross profit</span>
-                <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
-                  <TrendingUp className="w-3.5 h-3.5 text-white" />
+                <span className="text-xs font-medium text-orange-100">Gross profit</span>
+                <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                  <TrendingUp className="w-3 h-3 text-white" />
                 </span>
               </div>
-              {s.unpaidValue > 0 && (
-                <div className="text-[11px] text-orange-200/90 font-medium mt-1">
-                  pending payment: {money(s.unpaidValue, undefined, true)}
+              <div className="flex items-baseline justify-between mt-1">
+                <div className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                  {money(s.profit, undefined, true)}
                 </div>
-              )}
-              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-2">
-                {money(s.profit, undefined, true)}
+                <div className="text-[10px] text-orange-100/90 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-200"></span>
+                  this period
+                </div>
               </div>
             </div>
-            <div className="text-[11px] text-orange-100/90 flex items-center gap-1.5 mt-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-200"></span>
-              this period
+
+            {/* 2B. Pending Payments Card */}
+            <div className="flex-1 bg-white rounded-3xl border border-slate-200/70 p-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-600">Pending payment</span>
+                <span className="w-6 h-6 rounded-full bg-amber-50 border border-amber-200/70 flex items-center justify-center">
+                  <Clock className="w-3 h-3 text-amber-600" />
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between mt-1">
+                <div className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                  {money(s.unpaidValue, undefined, true)}
+                </div>
+                <div className="text-[10px] text-amber-600 font-medium">
+                  unpaid
+                </div>
+              </div>
             </div>
           </div>
 
