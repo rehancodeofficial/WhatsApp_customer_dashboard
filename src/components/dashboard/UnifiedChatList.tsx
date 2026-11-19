@@ -79,10 +79,6 @@ export function UnifiedChatList({
           {[
             { id: 'all', label: 'All' },
             { id: 'unread', label: 'Unread' },
-            { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
-            { id: 'email', label: 'Email', icon: Mail },
-            { id: 'human', label: 'Manual' },
-            { id: 'ai', label: 'AI' },
             { id: 'starred', label: 'Starred', icon: Star },
           ].map((item) => {
             const Icon = item.icon;

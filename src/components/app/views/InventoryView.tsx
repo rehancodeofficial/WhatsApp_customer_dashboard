@@ -8,11 +8,11 @@ import { api, Button, Card, CardHeader, Chip, cx, dateTime, Empty, ErrorNote, Fi
 import { BarList, ColumnChart } from '../charts';
 import { ExportButton } from '../ExportButton';
 
-type Tab = 'analytics' | 'stock' | 'log';
+type Tab = 'stock' | 'log' | 'analytics';
 const MOVE_LABEL: Record<InventoryMovement['type'], string> = { in: 'Stock in', out: 'Sold / out', adjustment: 'Adjustment', return: 'Return' };
 
 export function InventoryView({ perms }: { perms: Set<string> }) {
-  const [tab, setTab] = useState<Tab>('analytics');
+  const [tab, setTab] = useState<Tab>('stock');
   const [products, setProducts] = useState<Product[] | null>(null);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [movements, setMovements] = useState<InventoryMovement[] | null>(null);
@@ -44,7 +44,15 @@ export function InventoryView({ perms }: { perms: Set<string> }) {
         subtitle="Stock records, movement log and analytics. Replaces the Inventory sheet."
         right={
           <>
-            <PillTabs value={tab} onChange={setTab} items={[{ id: 'analytics', label: 'Analytics' }, { id: 'stock', label: 'Stock records', count: products?.length }, { id: 'log', label: 'Movement log' }]} />
+            <PillTabs
+              value={tab}
+              onChange={setTab}
+              items={[
+                { id: 'stock', label: 'Stock records', count: products?.length },
+                { id: 'log', label: 'Movement log' },
+                { id: 'analytics', label: 'Analytics' },
+              ]}
+            />
             <ExportButton entity="inventory" />
             {canManage && (
               <Button onClick={() => setEdit('new')}>

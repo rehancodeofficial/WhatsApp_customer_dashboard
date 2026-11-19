@@ -3,8 +3,8 @@ import { DEFAULT_CURRENCY } from '@/lib/currency';
 import React, { useEffect, useState } from 'react';
 import { ShoppingCart, TrendingUp, Package, Boxes, Clock } from 'lucide-react';
 import type { InventoryAnalytics, SalesAnalytics } from '@/lib/biz/logic';
-import { api, Card, CardHeader, cx, ErrorNote, Loading, money, num, PillTabs, shortDate, StatTile, StatusDot, Table, td } from '../ui';
-import { ColumnChart } from '../charts';
+import { api, Card, CardHeader, cx, ErrorNote, Loading, money, num, PillTabs, shortDate, StatusDot, Table, td } from '../ui';
+import { BarList } from '../charts';
 import { ORDER_STATUS } from './OrdersView';
 
 const RANGES = [
@@ -42,9 +42,7 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
     if (canOrders) {
       api<{ orders: any[] }>('/api/biz/orders')
         .then((d) => {
-          // Show pending orders first or all orders
-          const allOrders = d.orders || [];
-          setOrders(allOrders);
+          setOrders(d.orders || []);
         })
         .catch(() => {});
     }
@@ -55,6 +53,7 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
 
   // Filter pending orders for the dedicated pending orders display
   const pendingOrdersList = orders.filter((o) => o.status === 'pending');
+  const paidOrdersList = orders.filter((o) => o.status === 'paid' || o.payment_status === 'paid');
   const displayedOrders = pendingOrdersList.length > 0 ? pendingOrdersList : orders.slice(0, 6);
 
   return (
@@ -73,15 +72,15 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
 
       {s && (
         <div className={cx('grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-12 transition-opacity', loading && 'opacity-60')}>
-          {/* Revenue card */}
-          <Card className="xl:col-span-4 flex flex-col justify-between">
+          {/* 1. Total revenue Card */}
+          <div className="xl:col-span-3 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Total revenue</span>
-                <span className="text-[11px] text-slate-500 rounded-full border border-slate-200 px-2 py-0.5">{DEFAULT_CURRENCY} · last {days} days</span>
+                <span className="text-xs sm:text-sm text-slate-600 font-medium">Total revenue</span>
+                <span className="text-[10px] text-slate-500 rounded-full border border-slate-200 px-2 py-0.5">{DEFAULT_CURRENCY} · last {days} days</span>
               </div>
-              <div className="text-3xl sm:text-[34px] font-semibold tracking-tight text-slate-800 mt-2">{money(s.revenue)}</div>
-              <div className="text-xs text-slate-500 mt-1">
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-2">{money(s.revenue)}</div>
+              <div className="text-[11px] text-slate-400 mt-1">
                 {s.revenuePrev ? (
                   <>
                     <span className={s.revenue >= s.revenuePrev ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
@@ -94,50 +93,105 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-5">
+            <div className="grid grid-cols-2 gap-2 mt-4">
               {perms.has('orders.view') && (
-                <button onClick={() => onOpen('orders')} className="rounded-full bg-slate-800 text-white text-sm py-2.5 hover:bg-slate-700">
+                <button onClick={() => onOpen('orders')} className="rounded-full bg-slate-900 text-white text-xs font-semibold py-2 hover:bg-slate-800 transition-colors">
                   View orders
                 </button>
               )}
               {perms.has('broadcast.send') && (
-                <button onClick={() => onOpen('broadcast')} className="rounded-full bg-slate-100 text-slate-800 text-sm py-2.5 hover:bg-slate-200">
+                <button onClick={() => onOpen('broadcast')} className="rounded-full bg-slate-100 text-slate-700 text-xs font-semibold py-2 hover:bg-slate-200 transition-colors">
                   New broadcast
                 </button>
               )}
             </div>
-          </Card>
-
-          {/* 2×2 tiles */}
-          <div className="xl:col-span-8 grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatTile highlight label="Gross profit" value={money(s.profit, undefined, true)} icon={TrendingUp} delta={{ now: s.profit, prev: s.profitPrev }} hint="this period" />
-            <StatTile label="Orders" value={num(s.orders)} icon={ShoppingCart} delta={{ now: s.orders, prev: s.ordersPrev }} hint="this period" />
-            <StatTile label="Units sold" value={num(s.unitsSold)} icon={Package} hint="phones" />
-            <StatTile label="Stock value" value={inv ? money(inv.stockValueCost, undefined, true) : '—'} icon={Boxes} hint={inv ? `${num(inv.units)} units` : 'no access'} />
           </div>
 
-          {/* Revenue chart */}
-          <Card className="xl:col-span-12">
-            <CardHeader title="Revenue" subtitle="Cost of goods + profit, per day" />
-            <ColumnChart
-              data={s.series.map((p) => ({ ...p, cost: Math.max(0, p.revenue - p.profit), profit: Math.max(0, p.profit) }))}
-              xKey="label"
-              series={[
-                { key: 'cost', label: 'Cost', tone: 'slate' },
-                { key: 'profit', label: 'Profit', tone: 'hatch' },
-              ]}
-              height={180}
-            />
+          {/* 2. Gross profit Card (Orange Highlight) */}
+          <div className="xl:col-span-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-5 text-white flex flex-col justify-between shadow-lg shadow-orange-500/20 min-h-[170px]">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs sm:text-sm font-medium text-orange-100">Gross profit</span>
+                <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
+                  <TrendingUp className="w-3.5 h-3.5 text-white" />
+                </span>
+              </div>
+              {s.unpaidValue > 0 && (
+                <div className="text-[11px] text-orange-200/90 font-medium mt-1">
+                  pending payment: {money(s.unpaidValue, undefined, true)}
+                </div>
+              )}
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-2">
+                {money(s.profit, undefined, true)}
+              </div>
+            </div>
+            <div className="text-[11px] text-orange-100/90 flex items-center gap-1.5 mt-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-200"></span>
+              this period
+            </div>
+          </div>
+
+          {/* 3. Orders Card */}
+          <div className="xl:col-span-3 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs sm:text-sm text-slate-600 font-medium">Orders</span>
+                <span className="w-7 h-7 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center">
+                  <ShoppingCart className="w-3.5 h-3.5 text-slate-600" />
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-[11px] mt-1.5 text-slate-500">
+                <span className="text-emerald-600 font-medium">{paidOrdersList.length} paid</span>
+                <span>·</span>
+                <span className="text-amber-600 font-medium">{s.pendingOrders} pending</span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">{num(s.orders)}</span>
+                <span className="text-[11px] text-slate-400 font-medium">total</span>
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-3">
+              this period
+            </div>
+          </div>
+
+          {/* 4. Stock value Card */}
+          <div className="xl:col-span-3 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs sm:text-sm text-slate-600 font-medium">Stock value</span>
+                <span className="w-7 h-7 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center">
+                  <Boxes className="w-3.5 h-3.5 text-slate-600" />
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-2">
+                {inv ? money(inv.stockValueCost, undefined, true) : '—'}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-3">
+              {inv ? `${num(inv.units)} units` : 'no access'}
+            </div>
+          </div>
+
+          {/* 2 Graphs Side by Side: Sales by Country & Sales by Brand */}
+          <Card className="xl:col-span-6">
+            <CardHeader title="Sales by Country" subtitle="Revenue breakdown by destination" />
+            <BarList rows={s.byCountry.map((c) => ({ label: c.country, value: c.revenue, sub: `${c.orders} orders` }))} max={6} />
+          </Card>
+
+          <Card className="xl:col-span-6">
+            <CardHeader title="Sales by Brand" subtitle="Revenue contribution by manufacturer" />
+            <BarList rows={s.byBrand.map((b) => ({ label: b.brand, value: b.revenue, sub: `${num(b.units)} pcs` }))} tone="slate" max={6} />
           </Card>
 
           {/* Pending Orders Card */}
-          <Card className="md:col-span-2 xl:col-span-12">
+          <Card className="xl:col-span-12">
             <CardHeader
               title={pendingOrdersList.length > 0 ? "Pending Orders" : "Recent Orders"}
               subtitle={pendingOrdersList.length > 0 ? `${pendingOrdersList.length} orders awaiting processing` : "Latest order activity"}
               right={
                 perms.has('orders.view') && (
-                  <button onClick={() => onOpen('orders')} className="text-xs rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 hover:text-slate-800 flex items-center gap-1">
+                  <button onClick={() => onOpen('orders')} className="text-xs rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 hover:text-slate-800 flex items-center gap-1 font-medium transition-colors">
                     <Clock className="w-3.5 h-3.5 text-amber-500" /> View all in Orders
                   </button>
                 )
