@@ -5,6 +5,7 @@ import { getBizStore } from '@/lib/biz/store';
 import { loadCustomerViews } from '@/lib/biz/service';
 import { bizError } from '@/lib/biz/http';
 import { CustomerBody, ENTITY_PERMS, MovementBody, OrderBody, ProductBody, SupplierBody, zodMessage } from '@/lib/biz/schemas';
+import { watchInventory } from '@/lib/biz/inventory-sync';
 
 type Ctx = { params: Promise<{ entity: string }> };
 
@@ -79,11 +80,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const p = ProductBody.safeParse(body);
         if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
         const { opening_stock, ...data } = p.data;
-        const product = await store.saveProduct(null, data as any);
-        if (opening_stock) {
-          await store.addMovement({ product_id: product.id, type: 'in', quantity: opening_stock, unit_cost: product.cost_price, note: 'Opening stock', created_by: v.id });
-          product.stock_qty += opening_stock;
-        }
+        const product = await watchInventory('dashboard', async () => {
+          const created = await store.saveProduct(null, data as any);
+          if (opening_stock) {
+            await store.addMovement({ product_id: created.id, type: 'in', quantity: opening_stock, unit_cost: created.cost_price, note: 'Opening stock', created_by: v.id });
+            created.stock_qty += opening_stock;
+          }
+          return created;
+        });
         return NextResponse.json({ product });
       }
       case 'inventory': {
@@ -92,7 +96,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const d = p.data;
         // "in"/"return" always add stock, "out" always removes; "adjustment" keeps its sign.
         const qty = d.type === 'in' || d.type === 'return' ? Math.abs(d.quantity) : d.type === 'out' ? -Math.abs(d.quantity) : d.quantity;
-        return NextResponse.json({ movement: await store.addMovement({ ...d, quantity: qty, created_by: v.id } as any) });
+        return NextResponse.json({ movement: await watchInventory('dashboard', () => store.addMovement({ ...d, quantity: qty, created_by: v.id } as any)) });
       }
       case 'orders': {
         const p = OrderBody.safeParse(body);
@@ -100,7 +104,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         if (p.data.payment_status && p.data.payment_status !== 'unpaid' && !can(v, 'payments.manage')) {
           return NextResponse.json({ error: 'You do not have permission to set payment status' }, { status: 403 });
         }
-        return NextResponse.json({ order: await store.createOrder({ ...(p.data as any), source: 'dashboard', created_by: v.id }) });
+        return NextResponse.json({ order: await watchInventory('dashboard', () => store.createOrder({ ...(p.data as any), source: 'dashboard', created_by: v.id })) });
       }
     }
   } catch (e) {

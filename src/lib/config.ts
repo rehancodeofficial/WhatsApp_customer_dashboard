@@ -10,9 +10,29 @@ export function isDemoMode(): boolean {
   return !SUPABASE_URL || SUPABASE_URL.includes('mockproject') || SUPABASE_URL.includes('your-project');
 }
 
-export function canSendRealWhatsApp(): boolean {
+/** True when the dashboard has its own Meta token and can call the Cloud API directly. */
+export function hasDirectWhatsAppToken(): boolean {
   const token = process.env.WHATSAPP_ACCESS_TOKEN || '';
   return !!token && !token.startsWith('mock') && !token.startsWith('your-') && !!process.env.WHATSAPP_PHONE_NUMBER_ID;
+}
+
+/**
+ * The n8n "Dashboard Bridge" webhook. n8n holds the WhatsApp and Google credentials, so the
+ * dashboard sends WhatsApp messages and Inventory sheet updates through it.
+ * Set N8N_DASHBOARD_WEBHOOK_URL=off to disable.
+ */
+export const N8N_DASHBOARD_WEBHOOK_URL =
+  process.env.N8N_DASHBOARD_WEBHOOK_URL || 'https://phonebuzz.app.n8n.cloud/webhook/phonebuzz-dashboard';
+
+export function n8nBridgeEnabled(): boolean {
+  return !isDemoMode() && !!process.env.N8N_WEBHOOK_SECRET && N8N_DASHBOARD_WEBHOOK_URL !== 'off';
+}
+
+/** Owner's WhatsApp number: inventory alerts go here. */
+export const OWNER_WHATSAPP_NUMBER = (process.env.OWNER_WHATSAPP_NUMBER || '971525965784').replace(/[^0-9]/g, '');
+
+export function canSendRealWhatsApp(): boolean {
+  return hasDirectWhatsAppToken() || n8nBridgeEnabled();
 }
 
 /**

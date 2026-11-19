@@ -4,6 +4,7 @@ import { can } from '@/lib/permissions';
 import { getBizStore } from '@/lib/biz/store';
 import { bizError } from '@/lib/biz/http';
 import { CustomerPatch, ENTITY_PERMS, OrderPatch, ProductPatch, SupplierPatch, zodMessage } from '@/lib/biz/schemas';
+import { onProductDeleted, watchInventory } from '@/lib/biz/inventory-sync';
 
 type Ctx = { params: Promise<{ entity: string; id: string }> };
 
@@ -35,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if ((p.data.status || p.data.notes !== undefined) && !can(v, 'orders.manage')) return NextResponse.json({ error: 'You do not have permission to change orders' }, { status: 403 });
     if (p.data.payment_status && !can(v, 'payments.manage') && !can(v, 'orders.manage')) return NextResponse.json({ error: 'You do not have permission to change payment status' }, { status: 403 });
     try {
-      return NextResponse.json({ order: await getBizStore().updateOrder(id, p.data as any) });
+      return NextResponse.json({ order: await watchInventory('dashboard', () => getBizStore().updateOrder(id, p.data as any)) });
     } catch (e) {
       return bizError(e);
     }
@@ -56,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }
     const p = ProductPatch.safeParse(body);
     if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
-    return NextResponse.json({ product: await store.saveProduct(id, p.data as any) });
+    return NextResponse.json({ product: await watchInventory('dashboard', () => store.saveProduct(id, p.data as any)) });
   } catch (e) {
     return bizError(e);
   }
@@ -68,8 +69,11 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const v = await requireViewer(ENTITY_PERMS[entity].manage);
   if (v instanceof NextResponse) return v;
   try {
-    if (entity === 'products') await getBizStore().deleteProduct(id);
-    else await getBizStore().deleteSupplier(id);
+    if (entity === 'products') {
+      const product = (await getBizStore().listProducts()).find((p) => p.id === id);
+      await getBizStore().deleteProduct(id);
+      if (product) await onProductDeleted(product);
+    } else await getBizStore().deleteSupplier(id);
     return NextResponse.json({ success: true });
   } catch (e) {
     return bizError(e);

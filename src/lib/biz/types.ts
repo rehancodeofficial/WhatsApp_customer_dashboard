@@ -89,6 +89,7 @@ export interface Order {
   items?: OrderItem[];
   handoff_status?: string | null;
   payment_method?: string | null;
+  last_email_id?: string | null;
   owner_chat_link?: string | null;
 }
 
@@ -114,6 +115,7 @@ export interface CustomerRecord {
   customer_code?: string | null;
   delivery_address?: string | null;
   payment_method?: string | null;
+  last_email_id?: string | null;
   offer?: Record<string, unknown> | null;
 }
 

@@ -1,3 +1,6 @@
+import { hasDirectWhatsAppToken, n8nBridgeEnabled } from '@/lib/config';
+import { callN8nBridge } from '@/lib/n8n-bridge';
+
 export interface MetaWindowStatus {
   isOpen: boolean;
   remainingMs: number;
@@ -104,9 +107,10 @@ export async function sendMetaWhatsAppMessage({
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const apiVersion = process.env.WHATSAPP_API_VERSION || 'v21.0';
+  const direct = hasDirectWhatsAppToken();
 
-  if (!phoneNumberId || !accessToken) {
-    throw new Error('Meta WhatsApp Cloud API credentials missing (WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN)');
+  if (!direct && !n8nBridgeEnabled()) {
+    throw new Error('WhatsApp sending is not configured (no Meta token and no n8n bridge)');
   }
 
   const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
@@ -138,18 +142,27 @@ export async function sendMetaWhatsAppMessage({
     payload.audio = { link: mediaUrl };
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  let ok: boolean;
+  let data: any;
+  if (direct) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    data = await response.json();
+    ok = response.ok;
+  } else {
+    // n8n holds the WhatsApp credential and posts the payload to the Cloud API for us.
+    data = await callN8nBridge('send_whatsapp', { payload });
+    ok = !data?.error && !!data?.messages?.[0]?.id;
+    if (!ok && !data?.error) data = { error: { message: 'n8n did not return a WhatsApp message id' } };
+  }
 
-  const data = await response.json();
-
-  if (!response.ok) {
+  if (!ok) {
     const errorDetails = data?.error?.error_data?.details || data?.error?.message || 'Meta API error';
     const errorCode = data?.error?.code;
     const friendly = formatMetaError(errorCode, errorDetails);
