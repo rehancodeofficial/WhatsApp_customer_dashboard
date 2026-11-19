@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MessageSquare, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, KeyRound, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 const DEMO = [
   { label: 'Admin (full access)', email: 'admin@phonebuzz.demo', password: 'Admin@123' },
@@ -11,15 +11,18 @@ const DEMO = [
 
 function LoginForm() {
   const params = useSearchParams();
+  const [mode, setMode] = useState<'login' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [demo, setDemo] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [reason, setReason] = useState('');
 
   useEffect(() => {
     fetch('/api/health')
@@ -73,8 +76,31 @@ function LoginForm() {
         return;
       }
       const next = params.get('next');
-      // full navigation so the new session cookie is used everywhere
       window.location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Failed to submit reset request.');
+        return;
+      }
+      setSuccessMsg(data.message || 'Request submitted successfully.');
+    } catch {
+      setError('Unable to reach server. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -96,6 +122,96 @@ function LoginForm() {
           Create Admin account
         </button>
       </form>
+    );
+  }
+
+  if (mode === 'forgot') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('login');
+              setError(null);
+              setSuccessMsg(null);
+            }}
+            className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign In
+          </button>
+        </div>
+
+        <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <p className="font-semibold text-slate-800 mb-1">Password Assistance</p>
+          <ul className="list-disc pl-4 space-y-1 text-slate-500">
+            <li><b>Admin:</b> Direct password reset link will be sent to your email.</li>
+            <li><b>Staff / Agents:</b> Request will be forwarded to the Admin for identity verification and new password issuance.</li>
+          </ul>
+        </div>
+
+        {successMsg ? (
+          <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800 text-xs space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-sm text-emerald-900">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Request Submitted
+            </div>
+            <p>{successMsg}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('login');
+                setSuccessMsg(null);
+              }}
+              className="mt-2 w-full py-2 bg-emerald-600 text-white rounded-lg font-semibold text-xs hover:bg-emerald-700"
+            >
+              Return to Login
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleForgotPassword} className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="reset-email">
+                Registered Email
+              </label>
+              <input
+                id="reset-email"
+                type="email"
+                required
+                placeholder="e.g. name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="reset-reason">
+                Reason / Note for Admin (Optional)
+              </label>
+              <input
+                id="reset-reason"
+                type="text"
+                placeholder="e.g. Forgot password or device changed"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
+            {error && <p className="text-xs text-red-600">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold py-2.5 flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+              Send Password Reset Request
+            </button>
+          </form>
+        )}
+      </div>
     );
   }
 
@@ -122,9 +238,22 @@ function LoginForm() {
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="password">
-            Password
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold text-slate-600" htmlFor="password">
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('forgot');
+                setError(null);
+                setSuccessMsg(null);
+              }}
+              className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+            >
+              Forgot password?
+            </button>
+          </div>
           <div className="relative">
             <input
               id="password"

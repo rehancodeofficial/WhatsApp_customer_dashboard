@@ -1,25 +1,46 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, KeyRound, Plus, ShieldCheck, Trash2, UserCheck, UserX } from 'lucide-react';
+import { Check, KeyRound, Plus, ShieldCheck, Trash2, UserCheck, UserX, Clock, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { PERMISSION_GROUPS } from '@/lib/permissions';
 import { api, Avatar, Button, Card, CardHeader, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, PageHeader, PillTabs, StatusDot, Table, td } from '../ui';
 
 interface Role { id: string; name: string; description: string | null; permissions: string[] }
 interface Staff { id: string; email: string; full_name: string; role: 'owner' | 'agent'; role_id: string | null; active: boolean; created_at: string; last_sign_in_at?: string | null }
+interface PasswordResetRequest {
+  id: string;
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  reason?: string | null;
+  verification_notes?: string | null;
+  temporary_password?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export function TeamView({ currentUserId }: { currentUserId: string }) {
-  const [tab, setTab] = useState<'users' | 'roles'>('users');
+  const [tab, setTab] = useState<'users' | 'roles' | 'resets'>('users');
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [staff, setStaff] = useState<Staff[] | null>(null);
+  const [resetRequests, setResetRequests] = useState<PasswordResetRequest[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<Role | 'new' | null>(null);
   const [addUser, setAddUser] = useState(false);
   const [pwFor, setPwFor] = useState<Staff | null>(null);
+  const [verifyModalReq, setVerifyModalReq] = useState<PasswordResetRequest | null>(null);
+  const [completedCreds, setCompletedCreds] = useState<{ name: string; email: string; password: string } | null>(null);
 
   const load = useCallback(() => {
     api<{ roles: Role[] }>('/api/roles').then((d) => setRoles(d.roles)).catch((e) => setErr(e.message));
     api<{ staff: Staff[] }>('/api/staff').then((d) => setStaff(d.staff)).catch((e) => setErr(e.message));
+    api<{ requests: PasswordResetRequest[] }>('/api/staff/reset-requests')
+      .then((d) => setResetRequests(d.requests))
+      .catch(() => {});
   }, []);
   useEffect(load, [load]);
 
@@ -34,19 +55,29 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
       setErr(e.message);
     }
   };
-  const roleName = (s: Staff) => (s.role === 'owner' ? 'Admin (owner)' : roles?.find((r) => r.id === s.role_id)?.name || 'No role (no access)');
+
+  const pendingCount = resetRequests?.filter((r) => r.status === 'pending').length || 0;
 
   return (
     <div className="h-full overflow-y-auto pr-1">
       <PageHeader
         title="Team & Access"
-        subtitle="Only the Admin (owner) creates users and decides exactly what each role can do."
+        subtitle="Only the Admin (owner) creates users, configures roles, and verifies password reset requests."
         right={
           <>
-            <PillTabs value={tab} onChange={setTab} items={[{ id: 'users', label: 'Users', count: staff?.length }, { id: 'roles', label: 'Roles & permissions', count: roles?.length }]} />
-            {tab === 'users' ? (
+            <PillTabs
+              value={tab}
+              onChange={(t) => setTab(t as 'users' | 'roles' | 'resets')}
+              items={[
+                { id: 'users', label: 'Users', count: staff?.length },
+                { id: 'roles', label: 'Roles & permissions', count: roles?.length },
+                { id: 'resets', label: 'Reset requests', count: pendingCount > 0 ? pendingCount : undefined },
+              ]}
+            />
+            {tab === 'users' && (
               <Button onClick={() => setAddUser(true)}><Plus className="w-4 h-4" /> Add user</Button>
-            ) : (
+            )}
+            {tab === 'roles' && (
               <Button onClick={() => setEditRole('new')}><Plus className="w-4 h-4" /> New role</Button>
             )}
           </>
@@ -144,6 +175,62 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
         </div>
       )}
 
+      {tab === 'resets' && (
+        <Card>
+          {!resetRequests ? (
+            <Loading />
+          ) : resetRequests.length === 0 ? (
+            <Empty title="No password reset requests" text="When a team member requests a password reset from the login screen, it will appear here for verification." />
+          ) : (
+            <Table head={['Staff Member', 'Reason / Note', 'Requested', 'Status', 'Verification & Action']} minWidth={760}>
+              {resetRequests.map((req) => (
+                <tr key={req.id}>
+                  <td className={td}>
+                    <div className="flex items-center gap-3">
+                      <Avatar name={req.full_name} size={36} />
+                      <div>
+                        <div className="font-medium text-slate-800">{req.full_name}</div>
+                        <div className="text-xs text-slate-500">{req.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className={cx(td, 'text-xs text-slate-600 max-w-xs truncate')}>
+                    {req.reason || <span className="text-slate-400 italic">None provided</span>}
+                  </td>
+                  <td className={cx(td, 'text-xs text-slate-500')}>
+                    {dateTime(req.created_at)}
+                  </td>
+                  <td className={td}>
+                    {req.status === 'pending' ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        <Clock className="w-3 h-3" /> Pending Review
+                      </span>
+                    ) : req.status === 'completed' ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3" /> Fulfilled
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">{req.status}</span>
+                    )}
+                  </td>
+                  <td className={cx(td, 'text-right')}>
+                    {req.status === 'pending' ? (
+                      <Button size="sm" onClick={() => setVerifyModalReq(req)}>
+                        <ShieldAlert className="w-3.5 h-3.5 mr-1" /> Verify & Issue Password
+                      </Button>
+                    ) : (
+                      <div className="text-xs text-slate-400">
+                        Verified {req.reviewed_at ? dateTime(req.reviewed_at) : ''}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Card>
+      )}
+
       {editRole && (
         <RoleModal
           role={editRole === 'new' ? null : editRole}
@@ -176,6 +263,36 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
           }}
         />
       )}
+      {verifyModalReq && (
+        <VerifyAndResetModal
+          request={verifyModalReq}
+          onClose={() => setVerifyModalReq(null)}
+          onSuccess={(creds) => {
+            setVerifyModalReq(null);
+            setCompletedCreds(creds);
+            load();
+          }}
+        />
+      )}
+      {completedCreds && (
+        <Modal open onClose={() => setCompletedCreds(null)} title="Credentials Ready to Share">
+          <div className="space-y-4 text-xs">
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-emerald-900">
+              Identity verified and new password set successfully for <b>{completedCreds.name}</b>.
+            </div>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 font-mono">
+              <div><b>Email:</b> {completedCreds.email}</div>
+              <div><b>New Password:</b> {completedCreds.password}</div>
+            </div>
+            <p className="text-slate-500">
+              Please convey this temporary password to <b>{completedCreds.name}</b> directly via trusted internal channels (WhatsApp, in person, or voice call).
+            </p>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setCompletedCreds(null)}>Done</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -185,6 +302,98 @@ const IconBtn = ({ children, label, onClick, danger }: { children: React.ReactNo
     {children}
   </button>
 );
+
+function VerifyAndResetModal({
+  request,
+  onClose,
+  onSuccess,
+}: {
+  request: PasswordResetRequest;
+  onClose: () => void;
+  onSuccess: (creds: { name: string; email: string; password: string }) => void;
+}) {
+  const [pw, setPw] = useState('');
+  const [notes, setNotes] = useState('Identity verified by Admin');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let res = '';
+    for (let i = 0; i < 10; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPw(res);
+  };
+
+  useEffect(() => {
+    generateRandomPassword();
+  }, []);
+
+  const handleFulfill = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api('/api/staff/reset-requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          requestId: request.id,
+          newPassword: pw,
+          verificationNotes: notes,
+        }),
+      });
+      onSuccess({ name: request.full_name, email: request.email, password: pw });
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Verify & Reset: ${request.full_name}`}>
+      <ErrorNote text={err} />
+      <div className="space-y-4">
+        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600 space-y-1">
+          <div><b>User:</b> {request.full_name} ({request.email})</div>
+          <div><b>Reason:</b> {request.reason || 'None provided'}</div>
+          <div><b>Requested at:</b> {dateTime(request.created_at)}</div>
+        </div>
+
+        <Field label="Verification Check & Notes">
+          <input
+            className={inputCls}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Identity verified via phone call / internal chat"
+          />
+        </Field>
+
+        <Field
+          label="New Password for User"
+          hint="Must be at least 8 characters. Share this password directly with the team member."
+        >
+          <div className="flex gap-2">
+            <input
+              type="text"
+              className={cx(inputCls, 'font-mono text-sm')}
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+            />
+            <Button variant="light" size="sm" onClick={generateRandomPassword}>Generate</Button>
+          </div>
+        </Field>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="light" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={handleFulfill} loading={busy} disabled={pw.length < 8}>
+            Confirm & Issue Password
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClose: () => void; onSaved: (msg: string) => void }) {
   const [name, setName] = useState(role?.name || '');
@@ -318,4 +527,3 @@ function PasswordModal({ user, onClose, onSaved }: { user: Staff; onClose: () =>
     </Modal>
   );
 }
-
