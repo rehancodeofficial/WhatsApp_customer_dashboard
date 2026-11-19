@@ -96,6 +96,61 @@ function seed(): Store {
     { id: randomUUID(), conversation_id: conversations[1].id, from_mode: 'ai', to_mode: 'human', changed_by: null, reason: 'Owner took over the chat from the dashboard', created_at: ago(40) },
     { id: randomUUID(), conversation_id: conversations[2].id, from_mode: 'ai', to_mode: 'handoff', changed_by: null, reason: 'AI handed the order to sales', created_at: ago(119) },
   ];
+  // More demo customers (short chats) so customer records, filters and broadcasts have data.
+  const extra: [string, string, string, string, string, string, string[]][] = [
+    ['971551112233', 'Omar Haddad', 'United Arab Emirates', 'Arabic', 'Do you have Samsung S24 Ultra 512GB?', 'Yes, S24 Ultra 512GB is in stock at AED 3,950 for 20+ units.', ['Samsung']],
+    ['966551239876', 'Faisal Al Harbi', 'Saudi Arabia', 'Arabic', 'Need 100 pcs iPhone 14 128GB price', 'For 100 units iPhone 14 128GB is AED 2,350 per piece.', ['Apple']],
+    ['923211234567', 'Usman Tariq', 'Pakistan', 'Roman Urdu', 'Redmi Note 13 ka stock hai?', 'Ji haan, Redmi Note 13 256GB stock mein hai, AED 610 per piece.', ['Xiaomi']],
+    ['447700900123', 'James Carter', 'United Kingdom', 'English', 'Looking for refurbished iPhone 13 grade A', 'We have grade A refurbished iPhone 13 at AED 1,450 for 30+ units.', ['Apple']],
+    ['2348031234567', 'Chinedu Okafor', 'Nigeria', 'English', 'Tecno and Infinix wholesale price list please', 'Sharing the price list: Tecno Spark 20 AED 330, Infinix Hot 40 AED 360.', ['Tecno', 'Infinix']],
+    ['254722987654', 'Peter Kamau', 'Kenya', 'English', 'Any deal on Samsung A15?', 'Samsung A15 128GB is AED 520 per piece for 50+ units.', ['Samsung']],
+    ['97433123456', 'Khalid Al Thani', 'Qatar', 'Arabic', 'Pixel 8 Pro available?', 'Yes, Pixel 8 Pro 128GB at AED 2,650 per piece.', ['Google']],
+    ['9779812345678', 'Ram Shrestha', 'Nepal', 'English', 'Oppo Reno 11 price for 40 pcs', 'Oppo Reno 11 256GB is AED 1,180 per piece for 40 units.', ['Oppo']],
+  ];
+  extra.forEach(([wa, name, country, lang, ask, answer, brands], i) => {
+    const c: Contact = { id: randomUUID(), wa_id: wa, name, profile_name: name.split(' ')[0], country, preferred_language: lang, lead_id: `LEAD-${110 + i}`, lead_status: 'Interested', tags: [], notes: null, preferred_brands: brands, created_at: ago(9000 - i * 500) } as Contact;
+    contacts.push(c);
+    const cv = conv(c, 'ai', 60 * (6 + i * 9), 0);
+    conversations.push(cv);
+    const base = 60 * (6 + i * 9);
+    for (const [sender, body, min] of [['customer', ask, base + 2], ['ai', answer, base + 1], ['customer', 'Ok, will confirm soon. Thanks', base]] as const) {
+      const m = { ...msg(0, sender as Message['sender_type'], body, min), conversation_id: cv.id };
+      messages.push(m);
+      cv.last_message_preview = body;
+      cv.last_message_at = m.created_at;
+      if (sender === 'customer') cv.last_customer_message_at = m.created_at;
+    }
+  });
+  // Supplier chats (the AI asks suppliers for prices; their numbers match the demo suppliers).
+  const supplierChats: [string, string, [Message['sender_type'], string, number][]][] = [
+    ['971504440001', 'Gulf Mobile Distribution', [
+      ['ai', 'Hello, this is Phone Buzz. Do you have iPhone 15 Pro Max 256GB? We need 100 units. Please share your best price and delivery time.', 300],
+      ['customer', 'Yes available. AED 3,560 per piece, delivery 2 days Dubai.', 240],
+      ['ai', 'Thank you. We will confirm shortly.', 239],
+    ]],
+    ['8613800138000', 'Shenzhen Bright Tech', [
+      ['ai', 'Hello, Phone Buzz here. Price for Redmi Note 13 256GB, 500 units, delivered to Dubai?', 1500],
+      ['customer', 'USD 148/pc, 7 days by air. MOQ 300.', 1380],
+    ]],
+    ['85291234567', 'HK Prime Electronics', [
+      ['ai', 'Hi, do you have Pixel 8 Pro 128GB stock? 40 units.', 4000],
+      ['customer', 'Only 20 units now, HKD 4,950 each', 3900],
+      ['customer', 'Can ship tomorrow', 3899],
+    ]],
+  ];
+  for (const [wa, name, lines] of supplierChats) {
+    const c: Contact = { id: randomUUID(), wa_id: wa, name, profile_name: null, country: null, preferred_language: 'English', lead_id: null, lead_status: null, tags: [], notes: null, kind: 'supplier', created_at: ago(20000) };
+    contacts.push(c);
+    const cv = conv(c, 'ai', lines[lines.length - 1][2], 0);
+    conversations.push(cv);
+    for (const [sender, body, min] of lines) {
+      const m = { ...msg(0, sender, body, min), conversation_id: cv.id };
+      messages.push(m);
+      cv.last_message_preview = body;
+      cv.last_message_at = m.created_at;
+      if (sender === 'customer') cv.last_customer_message_at = m.created_at;
+    }
+  }
   return { contacts, conversations, messages, events, memory: [] };
 }
 
@@ -107,6 +162,14 @@ function store(): Store {
 
 export function resetDemoStore() {
   g.__phonebuzzDemoStore = seed();
+}
+
+/** Demo contacts (shared with the business modules: customers = contacts). */
+export function demoContacts(): Contact[] {
+  return store().contacts;
+}
+export function demoConversations() {
+  return store().conversations;
 }
 
 export function demoMemory(sessionId: string) {
@@ -132,6 +195,7 @@ export class MemoryRepo implements Repo {
       .filter((c) => !f.mode || f.mode === 'all' || c.mode === f.mode)
       .filter((c) => f.filter !== 'starred' || c.is_starred)
       .filter((c) => f.filter !== 'unread' || c.unread_count > 0)
+      .filter((c) => !f.party || (store().contacts.find((x) => x.id === c.contact_id)?.kind || 'customer') === f.party)
       .filter((c) => {
         const term = (f.q || '').trim().toLowerCase();
         if (!term) return true;
@@ -196,6 +260,7 @@ export class MemoryRepo implements Repo {
     if (input.preferred_language) contact.preferred_language = input.preferred_language;
     if (input.lead_id) contact.lead_id = input.lead_id;
     if (input.lead_status) contact.lead_status = input.lead_status;
+    if (input.party) contact.kind = input.party;
 
     let c = s.conversations.find((x) => x.contact_id === contact!.id);
     if (!c) {
@@ -219,8 +284,17 @@ export class MemoryRepo implements Repo {
 
   async logOutbound(input: OutboundInput) {
     const s = store();
-    const contact = s.contacts.find((x) => x.wa_id === input.wa_id);
-    const c = contact && s.conversations.find((x) => x.contact_id === contact.id);
+    let contact = s.contacts.find((x) => x.wa_id === input.wa_id);
+    let c = contact && s.conversations.find((x) => x.contact_id === contact!.id);
+    if (!c && input.party) {
+      const now = new Date().toISOString();
+      if (!contact) {
+        contact = { id: randomUUID(), wa_id: input.wa_id, name: input.name ?? null, profile_name: null, country: null, preferred_language: 'English', lead_id: null, lead_status: null, tags: [], notes: null, kind: input.party, created_at: now };
+        s.contacts.push(contact);
+      }
+      c = { id: randomUUID(), contact_id: contact.id, channel: 'whatsapp', ai_enabled: true, mode: 'ai', paused_by: null, paused_at: null, resume_at: null, assigned_to: null, last_message_at: now, last_customer_message_at: null, unread_count: 0, last_message_preview: null, status: 'open', is_starred: false, is_archived: false, payment_status: 'none', created_at: now };
+      s.conversations.push(c);
+    }
     if (!c) throw new Error('Conversation not found for wa_id ' + input.wa_id);
     const nowIso = new Date().toISOString();
     const m: Message = { id: randomUUID(), conversation_id: c.id, channel: 'whatsapp', wa_message_id: input.wa_message_id || null, direction: 'outbound', sender_type: input.sender_type, sender_user_id: input.sender_user_id ?? null, type: input.type, body: input.body ?? null, media_url: input.media_url || null, media_mime: input.media_mime || null, transcript_or_caption: null, status: input.status || 'sent', error_code: null, error_message: null, raw: input.raw ?? {}, created_at: nowIso };

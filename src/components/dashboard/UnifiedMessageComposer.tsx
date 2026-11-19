@@ -110,7 +110,7 @@ export function UnifiedMessageComposer({
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-emerald-600" />
+                <FileText className="w-4 h-4 text-orange-600" />
                 Select Approved WhatsApp Template
               </h3>
               <button
@@ -129,7 +129,7 @@ export function UnifiedMessageComposer({
                 <div
                   key={tmpl.name}
                   onClick={() => handleSendTemplate(tmpl.name)}
-                  className="p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 cursor-pointer transition-all"
+                  className="p-3.5 rounded-xl border border-slate-200 hover:border-orange-500 hover:bg-orange-50/40 cursor-pointer transition-all"
                 >
                   <div className="font-semibold text-xs text-slate-900 mb-1">
                     {tmpl.label}
@@ -196,7 +196,7 @@ export function UnifiedMessageComposer({
           type="submit"
           disabled={!text.trim() || isSending}
           className={`p-3 rounded-xl text-white disabled:opacity-40 transition-all shadow-xs ${
-            isEmail ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'
+            isEmail ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'
           }`}
           title="Send message"
         >

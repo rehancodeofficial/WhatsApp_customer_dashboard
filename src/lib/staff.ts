@@ -4,12 +4,15 @@ import { randomUUID, scryptSync, randomBytes, timingSafeEqual } from 'crypto';
 import { isDemoMode } from '@/lib/config';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import type { Role } from '@/lib/permissions';
+import { DEMO_MANAGEMENT_ROLE_ID } from '@/lib/roles';
 
 export interface StaffUser {
   id: string;
   email: string;
   full_name: string;
   role: Role;
+  /** Custom role for non-Admin users (decides their permissions). */
+  role_id: string | null;
   active: boolean;
   created_at: string;
   last_sign_in_at?: string | null;
@@ -50,6 +53,7 @@ function demoStaff(): DemoStaff[] {
       email: a.email,
       full_name: a.full_name,
       role: a.role,
+      role_id: a.role === 'owner' ? null : DEMO_MANAGEMENT_ROLE_ID,
       active: true,
       created_at: new Date().toISOString(),
       last_sign_in_at: null,
@@ -95,7 +99,7 @@ async function assertNotLastAdmin(id: string, list: StaffUser[]) {
 export async function listStaff(): Promise<StaffUser[]> {
   if (isDemoMode()) return demoStaff().map(strip);
   const db = getAdminSupabase();
-  const { data: profiles, error } = await db.from('profiles').select('id, full_name, role, active, created_at').order('created_at');
+  const { data: profiles, error } = await db.from('profiles').select('id, full_name, role, role_id, active, created_at').order('created_at');
   if (error) throw new StaffError(error.message, 500);
   const { data: users } = await db.auth.admin.listUsers({ perPage: 1000 });
   const byId = new Map((users?.users || []).map((u) => [u.id, u]));
@@ -104,13 +108,15 @@ export async function listStaff(): Promise<StaffUser[]> {
     email: byId.get(p.id)?.email || '',
     full_name: p.full_name,
     role: p.role,
+    role_id: p.role_id ?? null,
     active: p.active !== false,
     created_at: p.created_at,
     last_sign_in_at: byId.get(p.id)?.last_sign_in_at ?? null,
   }));
 }
 
-export async function createStaff(input: { email: string; full_name: string; password: string; role: Role }): Promise<StaffUser> {
+export async function createStaff(input: { email: string; full_name: string; password: string; role: Role; role_id?: string | null }): Promise<StaffUser> {
+  const role_id = input.role === 'owner' ? null : input.role_id ?? null;
   const email = input.email.trim().toLowerCase();
   if (!validEmail(email)) throw new StaffError('Enter a valid email');
   if (!input.full_name.trim()) throw new StaffError('Enter a name');
@@ -118,7 +124,7 @@ export async function createStaff(input: { email: string; full_name: string; pas
 
   if (isDemoMode()) {
     if (demoStaff().some((u) => u.email === email)) throw new StaffError('This email already has an account', 409);
-    const u: DemoStaff = { id: randomUUID(), email, full_name: input.full_name.trim(), role: input.role, active: true, created_at: new Date().toISOString(), last_sign_in_at: null, hash: hashPassword(input.password) };
+    const u: DemoStaff = { id: randomUUID(), email, full_name: input.full_name.trim(), role: input.role, role_id, active: true, created_at: new Date().toISOString(), last_sign_in_at: null, hash: hashPassword(input.password) };
     demoStaff().push(u);
     return strip(u);
   }
@@ -134,15 +140,15 @@ export async function createStaff(input: { email: string; full_name: string; pas
   // The DB trigger creates the profile; set the chosen role and name explicitly.
   const { error: pErr } = await db
     .from('profiles')
-    .upsert({ id: data.user.id, full_name: input.full_name.trim(), role: input.role, active: true }, { onConflict: 'id' });
+    .upsert({ id: data.user.id, full_name: input.full_name.trim(), role: input.role, role_id, active: true }, { onConflict: 'id' });
   if (pErr) throw new StaffError(pErr.message, 500);
-  return { id: data.user.id, email, full_name: input.full_name.trim(), role: input.role, active: true, created_at: data.user.created_at };
+  return { id: data.user.id, email, full_name: input.full_name.trim(), role: input.role, role_id, active: true, created_at: data.user.created_at };
 }
 
 export async function updateStaff(
   actorId: string | null,
   id: string,
-  changes: { full_name?: string; role?: Role; active?: boolean; password?: string }
+  changes: { full_name?: string; role?: Role; role_id?: string | null; active?: boolean; password?: string }
 ): Promise<StaffUser> {
   const list = await listStaff();
   const target = list.find((u) => u.id === id);
@@ -155,6 +161,8 @@ export async function updateStaff(
     const u = demoStaff().find((x) => x.id === id)!;
     if (changes.full_name?.trim()) u.full_name = changes.full_name.trim();
     if (changes.role) u.role = changes.role;
+    if (changes.role_id !== undefined) u.role_id = changes.role_id;
+    if (u.role === 'owner') u.role_id = null;
     if (typeof changes.active === 'boolean') u.active = changes.active;
     if (changes.password) u.hash = hashPassword(changes.password);
     return strip(u);
@@ -164,6 +172,8 @@ export async function updateStaff(
   const patch: Record<string, unknown> = {};
   if (changes.full_name?.trim()) patch.full_name = changes.full_name.trim();
   if (changes.role) patch.role = changes.role;
+  if (changes.role_id !== undefined) patch.role_id = changes.role_id;
+  if (changes.role === 'owner') patch.role_id = null;
   if (typeof changes.active === 'boolean') patch.active = changes.active;
   if (Object.keys(patch).length) {
     const { error } = await db.from('profiles').update(patch).eq('id', id);

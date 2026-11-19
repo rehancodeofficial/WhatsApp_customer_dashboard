@@ -6,7 +6,7 @@ export default defineConfig({
   timeout: 60_000,
   use: { baseURL: 'http://localhost:3200', trace: 'off' },
   webServer: {
-    command: 'npx next start -p 3200',
+    command: 'npx next dev -p 3200',
     url: 'http://localhost:3200/api/health',
     reuseExistingServer: true,
     env: { NEXT_PUBLIC_DEMO_MODE: 'true' },

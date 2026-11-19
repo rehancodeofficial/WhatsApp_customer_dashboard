@@ -17,13 +17,45 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [demo, setDemo] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [name, setName] = useState('');
 
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
       .then((d) => setDemo(!!d.demo))
       .catch(() => {});
+    fetch('/api/auth/setup')
+      .then((r) => r.json())
+      .then((d) => {
+        setNeedsSetup(!!d.needsSetup);
+        if (d.error) setSetupError(d.error);
+      })
+      .catch(() => {});
   }, []);
+
+  const createFirstAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: name, email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Could not create the account');
+        return;
+      }
+      setNeedsSetup(false);
+      await signIn();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const signIn = async (e?: React.FormEvent, creds?: { email: string; password: string }) => {
     e?.preventDefault();
@@ -48,8 +80,32 @@ function LoginForm() {
     }
   };
 
+  if (needsSetup) {
+    return (
+      <form onSubmit={createFirstAdmin} className="space-y-4">
+        <div className="rounded-lg bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-900">
+          <b>First-time setup.</b> No staff account exists yet. Create the first <b>Admin</b> account. After this, only an
+          Admin can add more staff.
+        </div>
+        <input required placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        <input required type="email" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        <input required minLength={8} type="password" placeholder="Password (8+ characters)" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <button type="submit" disabled={busy} className="w-full rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold py-2.5 flex items-center justify-center gap-2 disabled:opacity-60">
+          {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+          Create Admin account
+        </button>
+      </form>
+    );
+  }
+
   return (
     <>
+      {setupError && (
+        <p className="mb-4 text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2">
+          Database not ready: {setupError}. Run all files in supabase/migrations in the Supabase SQL Editor.
+        </p>
+      )}
       <form onSubmit={signIn} className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="email">
@@ -62,7 +118,7 @@ function LoginForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
           />
         </div>
         <div>
@@ -77,7 +133,7 @@ function LoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             <button
               type="button"
@@ -93,7 +149,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2.5 flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold py-2.5 flex items-center justify-center gap-2 disabled:opacity-60"
         >
           {busy && <Loader2 className="w-4 h-4 animate-spin" />}
           Sign in
@@ -127,13 +183,11 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="min-h-dvh flex items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
+      <div className="w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-sm p-7">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
-            <MessageSquare className="w-5 h-5" />
-          </div>
+          <img src="/logo.png" alt="Phone Buzz" className="w-12 h-12 rounded-2xl bg-slate-800 p-1" />
           <div>
-            <h1 className="text-base font-bold text-slate-800">Phone Buzz Inbox</h1>
+            <h1 className="text-base font-bold text-slate-800">Phone Buzz Dashboard</h1>
             <p className="text-xs text-slate-500">Sign in with your staff account</p>
           </div>
         </div>

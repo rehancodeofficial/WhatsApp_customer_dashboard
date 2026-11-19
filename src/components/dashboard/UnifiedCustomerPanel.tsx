@@ -42,14 +42,14 @@ export function UnifiedCustomerPanel({
         <div className="relative inline-block mx-auto mb-2.5">
           <div
             className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-lg uppercase shadow-xs ${
-              isEmail ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-800'
+              isEmail ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-800'
             }`}
           >
             {displayName?.substring(0, 2) || 'PB'}
           </div>
           <span
             className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[9px] text-white ${
-              contact.is_online ? 'bg-emerald-500' : 'bg-slate-300'
+              contact.is_online ? 'bg-orange-500' : 'bg-slate-300'
             }`}
             title={contact.is_online ? 'Customer is online' : 'Offline'}
           />
@@ -89,7 +89,7 @@ export function UnifiedCustomerPanel({
 
           <div className="flex items-center justify-between">
             <span className="text-slate-500">Lead Status:</span>
-            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+            <span className="font-semibold text-orange-700 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
               {contact.lead_status || 'Open Inquiry'}
             </span>
           </div>
@@ -121,7 +121,7 @@ export function UnifiedCustomerPanel({
             <span
               className={`font-bold px-2 py-0.5 rounded text-[11px] ${
                 conversation.payment_status === 'verified'
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  ? 'bg-orange-100 text-orange-800 border border-orange-200'
                   : conversation.payment_status === 'pending'
                   ? 'bg-amber-100 text-amber-800 border border-amber-200'
                   : 'bg-slate-200 text-slate-600'
@@ -145,7 +145,7 @@ export function UnifiedCustomerPanel({
               </button>
               <button
                 onClick={() => onUpdatePaymentStatus('verified')}
-                className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold shadow-xs"
+                className="px-2 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-semibold shadow-xs"
               >
                 Verify Payment
               </button>

@@ -24,6 +24,8 @@ interface UnifiedChatHeaderProps {
   onTriggerAiNow?: () => Promise<void>;
   onTogglePanel?: () => void;
   isPanelOpen?: boolean;
+  /** View-only users see the AI status but cannot pause / resume. */
+  canToggleAi?: boolean;
 }
 
 export function UnifiedChatHeader({
@@ -32,6 +34,7 @@ export function UnifiedChatHeader({
   onTriggerAiNow,
   onTogglePanel,
   isPanelOpen = true,
+  canToggleAi = true,
 }: UnifiedChatHeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -59,14 +62,14 @@ export function UnifiedChatHeader({
           <div className="relative">
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-xs ${
-                isEmail ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-800'
+                isEmail ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-800'
               }`}
             >
               {displayName?.substring(0, 2) || 'PB'}
             </div>
             <span
               className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px] ${
-                isEmail ? 'bg-blue-600' : 'bg-emerald-600'
+                isEmail ? 'bg-blue-600' : 'bg-orange-600'
               }`}
             >
               {isEmail ? <Mail className="w-2 h-2" /> : <MessageSquare className="w-2 h-2" />}
@@ -86,7 +89,7 @@ export function UnifiedChatHeader({
                   Email Thread
                 </span>
               ) : (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-semibold">
                   WhatsApp Direct
                 </span>
               )}
@@ -100,7 +103,7 @@ export function UnifiedChatHeader({
               {contact?.lead_status && (
                 <>
                   <span>·</span>
-                  <span className="text-emerald-600 font-medium">{contact.lead_status}</span>
+                  <span className="text-orange-600 font-medium">{contact.lead_status}</span>
                 </>
               )}
             </div>
@@ -114,7 +117,7 @@ export function UnifiedChatHeader({
             <div
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
                 windowStatus.isOpen
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  ? 'bg-orange-50 text-orange-700 border border-orange-200'
                   : 'bg-rose-50 text-rose-700 border border-rose-200'
               }`}
               title="Meta Cloud API 24-Hour Messaging Window"
@@ -124,7 +127,13 @@ export function UnifiedChatHeader({
             </div>
           )}
 
+          {!canToggleAi && (
+            <span className={`px-3 py-1.5 text-xs font-semibold rounded-full border ${conversation.mode === 'ai' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
+              {conversation.mode === 'ai' ? 'AI replying' : 'Manual · owner on WhatsApp'}
+            </span>
+          )}
           {/* AI On / Off Takeover Toggle */}
+          {canToggleAi && (
           <div className="relative">
             <div className="inline-flex rounded-lg shadow-xs border border-slate-200 overflow-hidden bg-white">
               <button
@@ -132,7 +141,7 @@ export function UnifiedChatHeader({
                 onClick={() => handleSwitch(conversation.mode === 'ai' ? 'human' : 'ai')}
                 className={`px-3.5 py-1.5 text-xs font-semibold flex items-center gap-2 transition-all ${
                   conversation.mode === 'ai'
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    ? 'bg-orange-600 text-white hover:bg-orange-700'
                     : 'bg-amber-500 text-white hover:bg-amber-600'
                 }`}
               >
@@ -155,7 +164,7 @@ export function UnifiedChatHeader({
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className={`px-2 py-1.5 border-l transition-all ${
                   conversation.mode === 'ai'
-                    ? 'border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700'
+                    ? 'border-orange-700 bg-orange-600 text-white hover:bg-orange-700'
                     : 'border-amber-600 bg-amber-500 text-white hover:bg-amber-600'
                 }`}
               >
@@ -173,7 +182,7 @@ export function UnifiedChatHeader({
                   onClick={() => handleSwitch('ai')}
                   className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
                 >
-                  <Bot className="w-4 h-4 text-emerald-600" />
+                  <Bot className="w-4 h-4 text-orange-600" />
                   <span>Resume AI Auto-Reply</span>
                 </button>
                 <button
@@ -208,12 +217,13 @@ export function UnifiedChatHeader({
               </div>
             )}
           </div>
+          )}
 
           {/* Resume & let AI reply now button */}
-          {conversation.mode !== 'ai' && onTriggerAiNow && (
+          {canToggleAi && conversation.mode !== 'ai' && onTriggerAiNow && (
             <button
               onClick={onTriggerAiNow}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 flex items-center gap-1.5 transition-all shadow-xs"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-300 flex items-center gap-1.5 transition-all shadow-xs"
               title="Resume AI and let it generate response to latest message"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
@@ -234,20 +244,9 @@ export function UnifiedChatHeader({
         </div>
       </div>
 
-      {/* Human Takeover Notice Banner */}
       {conversation.mode !== 'ai' && (
-        <div className="mt-2.5 px-3.5 py-2 rounded-lg bg-amber-50/90 border border-amber-200/80 flex items-center justify-between text-xs text-amber-900">
-          <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>
-              <strong>Owner Takeover Active:</strong> AI responses are blocked. Your manual replies are saved to conversation memory so the AI remembers them when resumed.
-            </span>
-          </div>
-          {conversation.resume_at && (
-            <span className="text-[11px] font-mono text-amber-700 font-semibold">
-              Auto-resumes in {Math.max(0, Math.round((new Date(conversation.resume_at).getTime() - Date.now()) / 60000))}m
-            </span>
-          )}
+        <div className="mt-2.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
+          <strong>Manual:</strong> the AI is paused and the owner is talking to this {conversation.contact?.kind === 'supplier' ? 'supplier' : 'customer'} from WhatsApp. Messages from this period are not shown here; the chat continues when the AI is back.
         </div>
       )}
     </div>

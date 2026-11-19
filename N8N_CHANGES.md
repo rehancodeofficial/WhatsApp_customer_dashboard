@@ -171,6 +171,64 @@ show an error there if one of them is not covered.
 
 ---
 
+## [9] Save every Google Sheet write in the dashboard too
+
+The flow writes to 9 sheets. Next to **each Google Sheets "append / update" node**, add one HTTP Request
+node that sends the **same row** to the dashboard. Keep the Sheets node for now (the AI still *reads*
+Inventory, Customer_Leads, etc. from the sheet), so nothing breaks; the dashboard gets a live copy.
+
+HTTP Request node (copy it once, then paste it next to every Sheets write and change only the URL):
+
+- Method `POST`, URL `https://YOUR-DASHBOARD/api/n8n/sync/<Sheet_Name>`
+- Authentication: the Header Auth credential from step 1 (`x-n8n-secret`)
+- Body: JSON, `{{ $json }}` when the Sheets node uses "Map automatically", otherwise the same columns as
+  the Sheets node (e.g. `{ "Lead_ID": "...", "WhatsApp_Number": "...", ... }`)
+- Settings → **On Error: Continue** (the dashboard must never stop the WhatsApp flow)
+
+| Google Sheets node(s) in the flow | URL ends with |
+|---|---|
+| Record or Update Customer Lead, Save Price Offer, Mark Offer Accepted, Save Payment Method, Save Outreach Lead, Reactivate AI for Customer, Save Language During Handoff | `/api/n8n/sync/Customer_Leads` |
+| Record or Update Customer, Save Customer Language During Handoff | `/api/n8n/sync/Customers` |
+| Reserve Stock in Inventory, Add Stock to Inventory, Add Product to Inventory | `/api/n8n/sync/Inventory` |
+| Create Order, Mark Order Payment Verified, Mark Email Order Payment Verified, Save Order Notes | `/api/n8n/sync/Orders` |
+| Create Order Item | `/api/n8n/sync/Order_Items` |
+| Save New Supplier, Save Supplier Language | `/api/n8n/sync/Suppliers` |
+| Record Supplier Request, Update Request Deal Status, Mark Request Completed / Supplier Selected / Expired, Mark Customer Notified | `/api/n8n/sync/Supplier_Requests` |
+| Save Supplier Price Request, Save Supplier Reply, Save Owner Target, Save Supplier Selection, Mark Quote Delivered, Save New Supplier Quotes | `/api/n8n/sync/Supplier_Quotes` |
+| Record Supplier Demand | `/api/n8n/sync/Supplier_Demands` |
+
+Rows are matched by their sheet ID (Lead_ID / WhatsApp_Number, ID, Order_ID, Order_Item_ID, Supplier_ID,
+Request_ID, Quote_ID, Demand_ID), so update nodes that send only a few columns change only those columns.
+Inventory: stock on hand = `Available_Qty + Reserved_Qty`; every change is written to the movement log.
+
+The chat sheets (`Customer_Chats`, `Supplier_Chats`, `Chat_Log`) are not needed any more: chats come in
+through steps 1 and 4. For **supplier** chats, add `"party": "supplier"` to the body of the inbound
+call (supplier message received) and of the outbound-log call (AI message to a supplier, with
+`"name": "<supplier name>"`). Customer calls stay as they are.
+
+**One-time copy of what is already in the sheet:** `npm run import-sheet-db` (safe to run again).
+
+## [10] Owner notifications in the dashboard
+
+Every WhatsApp node that messages the **owner** (Notify Owner on WhatsApp, Forward Customer Message to Owner,
+Alert Owner: AI Could Not Reply, Tell Owner …, Confirm … to Owner, Send Quote Summary to Owner, …):
+add an HTTP Request node **right after it**, POST `https://YOUR-DASHBOARD/api/n8n/notify`, same Header
+Auth, On Error: Continue, JSON body:
+
+```json
+{
+  "text": "{{ $('Notify Owner on WhatsApp').params.textBody }}",
+  "wa_id": "{{ $('Inquiry Data').first().json.whatsapp_number }}",
+  "party": "customer"
+}
+```
+
+- `text`: the same message the owner gets (copy the WhatsApp node's message expression).
+- `wa_id`: the customer's (or supplier's, with `"party": "supplier"`) number, so the notification opens
+  that chat and links to WhatsApp. Leave it out for alerts that are not about one person.
+- Optional: `title`, `type` (`handoff`, `order`, `payment`, `supplier`, `error`, `info`), `order_no`,
+  `request_id`. Without them the dashboard reads the title, type, `ORD-…` and `SR-…` from the text.
+
 ## Test checklist
 
 1. Message the business number from your phone → the chat appears in the dashboard, the AI replies, and the reply shows in the dashboard.

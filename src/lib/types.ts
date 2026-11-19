@@ -20,6 +20,12 @@ export interface Contact {
   lead_status: string | null;
   tags: string[];
   notes: string | null;
+  /** customer (default) or supplier */
+  kind?: 'customer' | 'supplier';
+  city?: string | null;
+  payment_tier?: 'high' | 'medium' | 'low' | null;
+  preferred_brands?: string[];
+  marketing_opt_in?: boolean;
   is_online?: boolean;
   last_seen_at?: string | null;
   created_at: string;

@@ -1,8 +1,28 @@
 @import "tailwindcss";
 
+/* PhoneBuzz brand palette */
+@theme {
+  --color-brand: #F97316;
+  --color-brand-50: #FFF7ED;
+  --color-brand-100: #FFEDD5;
+  --color-brand-200: #FED7AA;
+  --color-brand-600: #EA580C;
+  --color-brand-700: #C2410C;
+  --color-ink: #1E293B;
+  --color-canvas: #F8FAFC;
+  --color-card: #FFFFFF;
+  --color-line: #E2E8F0;
+  --color-muted: #64748B;
+}
+
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #F8FAFC;
+  --foreground: #1E293B;
+}
+
+/* Hatched fill used for the second series in charts (like the reference design). */
+.hatch-brand {
+  background-image: repeating-linear-gradient(135deg, #F97316 0 4px, #FB923C 4px 7px);
 }
 
 body {

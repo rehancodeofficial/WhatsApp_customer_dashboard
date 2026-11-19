@@ -6,6 +6,7 @@ import { deleteStaff, updateStaff, StaffError } from '@/lib/staff';
 const PatchBody = z.object({
   full_name: z.string().min(1).max(100).optional(),
   role: z.enum(['owner', 'agent']).optional(),
+  role_id: z.string().uuid().nullable().optional(),
   active: z.boolean().optional(),
   password: z.string().min(8).max(200).optional(),
 });

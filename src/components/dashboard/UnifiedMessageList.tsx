@@ -1,218 +1,168 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
-import { Message } from '@/lib/types';
+import React, { useEffect, useMemo, useRef } from 'react';
+import type { AIModeEvent, Message } from '@/lib/types';
 import { formatTime } from '@/lib/utils';
-import {
-  Check,
-  CheckCheck,
-  AlertCircle,
-  Bot,
-  UserCheck,
-  FileText,
-  Download,
-  Mail,
-  Sparkles,
-} from 'lucide-react';
+import { AlertCircle, Bot, Check, CheckCheck, Download, FileText, Hand, MessageSquare } from 'lucide-react';
 
-interface UnifiedMessageListProps {
+// View-only WhatsApp-style chat. Shows ONLY the customer's (or supplier's) messages and the AI's
+// replies. When the AI was paused, the owner talked to the customer from his own WhatsApp, so that
+// period is shown as one "Manual" marker and its messages are left out. The chat continues
+// normally from the moment the AI is back.
+
+interface Props {
   messages: Message[];
+  events?: AIModeEvent[];
+  /** Current mode of the chat: when it is not 'ai', the manual period is still open. */
+  currentMode?: 'ai' | 'human' | 'handoff';
+  party?: 'customer' | 'supplier';
   channel?: 'whatsapp' | 'email';
 }
 
-export function UnifiedMessageList({ messages, channel = 'whatsapp' }: UnifiedMessageListProps) {
+type Item =
+  | { kind: 'msg'; m: Message }
+  | { kind: 'manual'; from: string; to: string | null; hidden: number }
+  | { kind: 'day'; label: string };
+
+function manualWindows(events: AIModeEvent[], currentMode?: string) {
+  const sorted = [...events].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const out: { from: string; to: string | null }[] = [];
+  let open: string | null = null;
+  for (const e of sorted) {
+    if (e.to_mode !== 'ai' && open === null) open = e.created_at;
+    else if (e.to_mode === 'ai' && open !== null) {
+      out.push({ from: open, to: e.created_at });
+      open = null;
+    }
+  }
+  if (open !== null) out.push({ from: open, to: null });
+  // Chat is paused but the pause event is older than what we loaded.
+  if (!out.some((w) => w.to === null) && currentMode && currentMode !== 'ai') out.push({ from: sorted.at(-1)?.created_at || new Date(0).toISOString(), to: null });
+  return out;
+}
+
+export function UnifiedMessageList({ messages, events = [], currentMode, party = 'customer' }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const items = useMemo<Item[]>(() => {
+    const windows = manualWindows(events, currentMode);
+    const inWindow = (t: string) => windows.find((w) => t >= w.from && (w.to === null || t < w.to));
+    // Only the customer / supplier and the AI. Owner, staff and system messages are never shown.
+    const visible = messages.filter((m) => m.direction === 'inbound' || m.sender_type === 'ai');
+    const list: Item[] = [];
+    const shownWindows = new Map<string, Extract<Item, { kind: 'manual' }>>();
+    let lastDay = '';
+    const pushDay = (iso: string) => {
+      const d = new Date(iso).toDateString();
+      if (d !== lastDay) {
+        lastDay = d;
+        list.push({ kind: 'day', label: new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) });
+      }
+    };
+    for (const m of visible) {
+      const w = m.sender_type === 'ai' ? null : inWindow(m.created_at);
+      if (w) {
+        const key = w.from;
+        let marker = shownWindows.get(key);
+        if (!marker) {
+          pushDay(w.from);
+          marker = { kind: 'manual', from: w.from, to: w.to, hidden: 0 };
+          shownWindows.set(key, marker);
+          list.push(marker);
+        }
+        marker.hidden++;
+        continue;
+      }
+      pushDay(m.created_at);
+      list.push({ kind: 'msg', m });
+    }
+    // Manual periods without any customer message still get their marker (in time order).
+    for (const w of windows) {
+      if (shownWindows.has(w.from)) continue;
+      const marker: Item = { kind: 'manual', from: w.from, to: w.to, hidden: 0 };
+      const idx = list.findIndex((it) => it.kind === 'msg' && it.m.created_at > w.from);
+      if (idx === -1) list.push(marker);
+      else list.splice(idx, 0, marker);
+    }
+    return list;
+  }, [messages, events, currentMode]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [items.length]);
 
-  const renderStatus = (msg: Message) => {
-    if (msg.direction !== 'outbound') return null;
-
-    if (msg.status === 'failed') {
-      return (
-        <span className="text-rose-500 flex items-center gap-0.5" title={msg.error_message || 'Delivery failed'}>
-          <AlertCircle className="w-3.5 h-3.5" />
-        </span>
-      );
-    }
-    if (msg.status === 'read') {
-      return (
-        <span title="Read by recipient">
-          <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
-        </span>
-      );
-    }
-    if (msg.status === 'delivered') {
-      return (
-        <span title="Delivered">
-          <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
-        </span>
-      );
-    }
-    return (
-      <span title="Sent">
-        <Check className="w-3.5 h-3.5 text-slate-400" />
-      </span>
-    );
+  const status = (m: Message) => {
+    if (m.direction !== 'outbound') return null;
+    if (m.status === 'failed') return <AlertCircle className="w-3.5 h-3.5 text-rose-500" aria-label={m.error_message || 'Failed'} />;
+    if (m.status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-500" aria-label="Read" />;
+    if (m.status === 'delivered') return <CheckCheck className="w-3.5 h-3.5 text-slate-400" aria-label="Delivered" />;
+    return <Check className="w-3.5 h-3.5 text-slate-400" aria-label="Sent" />;
   };
+  const who = party === 'supplier' ? 'Supplier' : 'Customer';
 
   return (
-    <div
-      className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/70"
-      style={{
-        backgroundImage: `radial-gradient(circle, rgba(148, 163, 184, 0.12) 1px, transparent 1px)`,
-        backgroundSize: '20px 20px',
-      }}
-    >
-      {messages.length === 0 ? (
-        <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400 text-xs">
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 text-slate-300">
-            <Mail className="w-6 h-6" />
-          </div>
-          <p className="font-medium text-slate-600">No message history yet</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            Incoming and outgoing messages for this conversation will appear here.
-          </p>
+    <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-2 bg-[#f5efe6]" style={{ backgroundImage: 'radial-gradient(circle, rgba(30,41,59,0.05) 1px, transparent 1px)', backgroundSize: '18px 18px' }}>
+      {items.length === 0 ? (
+        <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 text-xs">
+          <MessageSquare className="w-6 h-6 mb-2 text-slate-400" />
+          <p className="font-medium text-slate-600">No messages yet</p>
         </div>
       ) : (
-        messages.map((msg, index) => {
-          const isInbound = msg.direction === 'inbound';
-          const isAI = msg.sender_type === 'ai';
-          const isAgent = msg.sender_type === 'agent';
-
-          const showDateHeader =
-            index === 0 ||
-            new Date(msg.created_at).toDateString() !==
-              new Date(messages[index - 1].created_at).toDateString();
-
-          return (
-            <React.Fragment key={msg.id || index}>
-              {/* Date divider */}
-              {showDateHeader && (
-                <div className="flex justify-center my-3">
-                  <span className="px-3 py-1 rounded-full bg-white text-[10px] font-semibold text-slate-500 shadow-xs border border-slate-200/80">
-                    {new Date(msg.created_at).toLocaleDateString([], {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </span>
-                </div>
-              )}
-
-              {/* Message row */}
-              <div
-                className={`flex flex-col ${
-                  isInbound ? 'items-start' : 'items-end'
-                }`}
-              >
-                {/* Sender Tag Header */}
-                {!isInbound && (
-                  <div className="flex items-center gap-1.5 mb-1 px-1.5 text-[10px] font-semibold">
-                    {isAI ? (
-                      <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        <Sparkles className="w-3 h-3 text-emerald-600" /> AI Sales Agent
-                      </span>
-                    ) : isAgent ? (
-                      <span className="flex items-center gap-1 text-slate-800 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-xs">
-                        <UserCheck className="w-3 h-3 text-amber-500" /> PhoneBuzz Staff
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">System</span>
-                    )}
-                  </div>
-                )}
-
-                {/* Bubble Container */}
-                <div
-                  className={`max-w-[78%] rounded-2xl px-4 py-2.5 shadow-xs text-xs relative transition-all ${
-                    isInbound
-                      ? 'bg-white text-slate-800 rounded-tl-xs border border-slate-200/80'
-                      : isAI
-                      ? 'bg-emerald-50/90 text-slate-900 rounded-tr-xs border border-emerald-200'
-                      : 'bg-white text-slate-900 rounded-tr-xs border border-slate-200 shadow-xs'
-                  }`}
-                >
-                  {/* Email Subject line if present */}
-                  {msg.subject && (
-                    <div className="mb-1.5 pb-1.5 border-b border-slate-200/60 font-semibold text-[11px] text-slate-800">
-                      Subject: {msg.subject}
-                    </div>
-                  )}
-
-                  {/* Media Content */}
-                  {msg.type === 'image' && msg.media_url && (
-                    <div className="mb-2 rounded-xl overflow-hidden border border-slate-200">
-                      <img
-                        src={msg.media_url}
-                        alt="Attached media"
-                        className="max-h-64 w-auto object-cover"
-                      />
-                    </div>
-                  )}
-
-                  {msg.type === 'audio' && msg.media_url && (
-                    <div className="mb-2 p-1 bg-slate-50 rounded-lg border border-slate-200">
-                      <audio controls src={msg.media_url} className="h-8 w-full max-w-xs" />
-                    </div>
-                  )}
-
-                  {/* Body Text */}
-                  {msg.body && (
-                    <p className="whitespace-pre-wrap leading-relaxed break-words font-normal">
-                      {msg.body}
-                    </p>
-                  )}
-
-                  {/* Gemini Transcription or Caption */}
-                  {msg.transcript_or_caption && (
-                    <div className="mt-2 p-2 rounded-lg bg-emerald-50/60 border-l-2 border-emerald-500 text-[11px] text-slate-700">
-                      <span className="font-semibold text-emerald-700 block text-[10px] mb-0.5">
-                        Gemini AI Transcription:
-                      </span>
-                      {msg.transcript_or_caption}
-                    </div>
-                  )}
-
-                  {/* Attachments if any */}
-                  {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {msg.attachments.map((att, attIdx) => (
-                        <a
-                          key={attIdx}
-                          href={att.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] transition-colors"
-                        >
-                          <div className="flex items-center space-x-2 truncate">
-                            <FileText className="w-3.5 h-3.5 text-slate-500" />
-                            <span className="truncate">{att.name}</span>
-                          </div>
-                          <Download className="w-3 h-3 text-slate-400 shrink-0 ml-2" />
-                        </a>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Error display if Meta delivery failed */}
-                  {msg.status === 'failed' && msg.error_message && (
-                    <div className="mt-2 p-2 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700 font-medium">
-                      {msg.error_message}
-                    </div>
-                  )}
-
-                  {/* Bubble Footer */}
-                  <div className="flex items-center justify-end gap-1 mt-1.5 text-[10px] text-slate-400 select-none">
-                    <span>{formatTime(msg.created_at)}</span>
-                    {renderStatus(msg)}
-                  </div>
+        items.map((it, i) => {
+          if (it.kind === 'day') {
+            return (
+              <div key={`d${i}`} className="flex justify-center py-2">
+                <span className="px-3 py-1 rounded-lg bg-white/90 text-[11px] text-slate-600 shadow-sm">{it.label}</span>
+              </div>
+            );
+          }
+          if (it.kind === 'manual') {
+            return (
+              <div key={`w${it.from}`} className="flex justify-center py-1.5">
+                <div className="max-w-[90%] rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-900 text-center">
+                  <span className="inline-flex items-center gap-1 font-semibold">
+                    <Hand className="w-3.5 h-3.5" /> Manual
+                  </span>{' '}
+                  · AI paused at {formatTime(it.from)}, owner handled this chat on WhatsApp
+                  {it.to ? ` until ${formatTime(it.to)}` : ''}.
+                  {it.hidden > 0 && ` ${it.hidden} message${it.hidden === 1 ? '' : 's'} from this period not shown.`}
+                  {it.to && <span className="block mt-0.5 font-semibold text-orange-700">AI is back from here</span>}
                 </div>
               </div>
-            </React.Fragment>
+            );
+          }
+          const m = it.m;
+          const inbound = m.direction === 'inbound';
+          return (
+            <div key={m.id} className={`flex ${inbound ? 'justify-start' : 'justify-end'}`}>
+              <div
+                className={`relative max-w-[85%] sm:max-w-[70%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed shadow-sm ${
+                  inbound ? 'bg-white text-slate-800 rounded-tl-sm' : 'bg-orange-100 text-slate-900 rounded-tr-sm'
+                }`}
+              >
+                <div className={`flex items-center gap-1 text-[10px] font-semibold mb-0.5 ${inbound ? 'text-slate-500' : 'text-orange-700'}`}>
+                  {inbound ? who : (<><Bot className="w-3 h-3" /> AI</>)}
+                </div>
+                {m.type === 'image' && m.media_url && <img src={m.media_url} alt="" className="mb-1.5 rounded-lg max-h-64 w-auto" />}
+                {m.type === 'audio' && m.media_url && <audio controls src={m.media_url} className="mb-1.5 h-8 w-56 max-w-full" />}
+                {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
+                {m.transcript_or_caption && (
+                  <p className="mt-1 text-[11px] text-slate-600 border-l-2 border-orange-400 pl-2">
+                    <span className="font-semibold">{m.type === 'audio' ? 'Voice note: ' : 'Image: '}</span>
+                    {m.transcript_or_caption}
+                  </p>
+                )}
+                {m.attachments?.map((a, ai) => (
+                  <a key={ai} href={a.url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-2 text-[11px] text-slate-700 underline">
+                    <FileText className="w-3.5 h-3.5" /> {a.name} <Download className="w-3 h-3" />
+                  </a>
+                ))}
+                <div className="flex items-center justify-end gap-1 mt-0.5 text-[10px] text-slate-500">
+                  <span>{formatTime(m.created_at)}</span>
+                  {status(m)}
+                </div>
+              </div>
+            </div>
           );
         })
       )}

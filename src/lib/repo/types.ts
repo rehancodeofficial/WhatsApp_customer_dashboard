@@ -12,10 +12,15 @@ export interface Viewer {
   id: string | null; // null = system / n8n / demo
   role: 'owner' | 'agent';
   name?: string;
+  /** Permissions from the user's custom role (ignored for owner). */
+  permissions?: readonly string[];
 }
+
+export type Party = 'customer' | 'supplier';
 
 export interface InboundInput {
   wa_id: string;
+  party?: Party;
   wa_message_id: string;
   name?: string | null;
   profile_name?: string | null;
@@ -42,6 +47,9 @@ export interface InboundResult {
 
 export interface OutboundInput {
   wa_id: string;
+  /** When set and no chat exists yet (e.g. the AI writes to a supplier first), the chat is created. */
+  party?: Party;
+  name?: string | null;
   wa_message_id?: string | null;
   type: string;
   body?: string | null;
@@ -65,6 +73,7 @@ export interface ConversationFilters {
   mode?: string | null;
   filter?: string | null;
   q?: string | null; // search name, number or message text
+  party?: Party | null;
 }
 
 export interface ConversationDetail {

@@ -22,7 +22,13 @@ export class SupabaseRepo implements Repo {
   }
 
   async listConversations(viewer: Viewer, f: ConversationFilters = {}) {
-    let q = this.db.from('conversations').select('*, contacts (*)').order('last_message_at', { ascending: false }).limit(500);
+    let q = this.db
+      .from('conversations')
+      .select(f.party ? '*, contacts!inner (*)' : '*, contacts (*)')
+      .order('last_message_at', { ascending: false })
+      .limit(500);
+    if (f.party === 'supplier') q = q.eq('contacts.kind', 'supplier');
+    if (f.party === 'customer') q = q.neq('contacts.kind', 'supplier');
     if (f.channel && f.channel !== 'all') q = q.eq('channel', f.channel);
     if (f.mode && f.mode !== 'all') q = q.eq('mode', f.mode);
     if (f.filter === 'archived') q = q.eq('is_archived', true);
@@ -120,6 +126,7 @@ export class SupabaseRepo implements Repo {
     if (input.preferred_language) contactRow.preferred_language = input.preferred_language;
     if (input.lead_id) contactRow.lead_id = input.lead_id;
     if (input.lead_status) contactRow.lead_status = input.lead_status;
+    if (input.party) contactRow.kind = input.party;
 
     const { data: contact, error: cErr } = await this.db
       .from('contacts')
@@ -192,7 +199,18 @@ export class SupabaseRepo implements Repo {
   }
 
   async logOutbound(input: OutboundInput) {
-    const conv = await this.findConversationByWaId(input.wa_id);
+    let conv = await this.findConversationByWaId(input.wa_id);
+    if (!conv && input.party) {
+      // e.g. the AI writes to a supplier before the supplier ever wrote to us.
+      const { data: contact, error: cErr } = await this.db
+        .from('contacts')
+        .upsert({ wa_id: input.wa_id, kind: input.party, ...(input.name ? { name: input.name } : {}) }, { onConflict: 'wa_id' })
+        .select('id')
+        .single();
+      if (cErr || !contact) throw new Error('contact upsert failed: ' + cErr?.message);
+      await this.db.from('conversations').upsert({ contact_id: contact.id, channel: 'whatsapp', mode: 'ai', ai_enabled: true }, { onConflict: 'contact_id' });
+      conv = await this.findConversationByWaId(input.wa_id);
+    }
     if (!conv) throw new Error('Conversation not found for wa_id ' + input.wa_id);
     const nowIso = new Date().toISOString();
     const row = {

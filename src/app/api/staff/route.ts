@@ -8,6 +8,7 @@ const CreateBody = z.object({
   full_name: z.string().min(1).max(100),
   password: z.string().min(8).max(200),
   role: z.enum(['owner', 'agent']),
+  role_id: z.string().uuid().nullable().optional(),
 });
 
 export async function GET() {

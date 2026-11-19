@@ -89,6 +89,7 @@ export async function sendMetaWhatsAppMessage({
   text,
   templateName,
   templateLanguage = 'en',
+  templateParams,
   mediaUrl,
 }: {
   to: string; // recipient phone e.164 without '+'
@@ -96,6 +97,8 @@ export async function sendMetaWhatsAppMessage({
   text?: string;
   templateName?: string;
   templateLanguage?: string;
+  /** Values for the template body variables {{1}}, {{2}}, ... */
+  templateParams?: string[];
   mediaUrl?: string;
 }): Promise<{ waMessageId: string; rawResponse: any }> {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -123,6 +126,9 @@ export async function sendMetaWhatsAppMessage({
     payload.template = {
       name: templateName,
       language: { code: templateLanguage },
+      ...(templateParams?.length
+        ? { components: [{ type: 'body', parameters: templateParams.map((t) => ({ type: 'text', text: t })) }] }
+        : {}),
     };
   } else if (type === 'image') {
     payload.image = { link: mediaUrl, caption: text };

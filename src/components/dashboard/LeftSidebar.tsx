@@ -14,6 +14,7 @@ import {
   BarChart3,
   Settings,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 
 export type NavItem =
@@ -27,13 +28,15 @@ export type NavItem =
   | 'ai-activity'
   | 'handoff'
   | 'analytics'
-  | 'settings';
+  | 'settings'
+  | 'staff';
 
 interface LeftSidebarProps {
   currentTab: NavItem;
   onTabChange: (tab: NavItem) => void;
   unreadCount?: number;
   waitingHumanCount?: number;
+  isAdmin?: boolean;
 }
 
 export function LeftSidebar({
@@ -41,11 +44,13 @@ export function LeftSidebar({
   onTabChange,
   unreadCount = 0,
   waitingHumanCount = 0,
+  isAdmin = false,
 }: LeftSidebarProps) {
+  // Management only sees inbox views; Admin also gets Overview, Analytics, Staff and Settings.
   const mainNav = [
-    { id: 'overview' as NavItem, label: 'Overview', icon: LayoutDashboard },
+    ...(isAdmin ? [{ id: 'overview' as NavItem, label: 'Overview', icon: LayoutDashboard }] : []),
     { id: 'unified-inbox' as NavItem, label: 'Unified Inbox', icon: Inbox, badge: unreadCount },
-    { id: 'whatsapp' as NavItem, label: 'WhatsApp Chats', icon: MessageSquare, accent: 'text-emerald-600' },
+    { id: 'whatsapp' as NavItem, label: 'WhatsApp Chats', icon: MessageSquare, accent: 'text-orange-600' },
     { id: 'email' as NavItem, label: 'Email Threads', icon: Mail, accent: 'text-blue-600' },
   ];
 
@@ -57,23 +62,26 @@ export function LeftSidebar({
     { id: 'archived' as NavItem, label: 'Archived', icon: Archive },
   ];
 
-  const adminNav = [
-    { id: 'analytics' as NavItem, label: 'Analytics', icon: BarChart3 },
-    { id: 'settings' as NavItem, label: 'Settings', icon: Settings },
-  ];
+  const adminNav = isAdmin
+    ? [
+        { id: 'analytics' as NavItem, label: 'Analytics', icon: BarChart3 },
+        { id: 'staff' as NavItem, label: 'Staff & Access', icon: ShieldCheck },
+        { id: 'settings' as NavItem, label: 'Settings', icon: Settings },
+      ]
+    : [];
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col h-full select-none shrink-0 z-20">
       {/* Brand Header */}
       <div className="h-16 px-5 flex items-center justify-between border-b border-slate-100">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-xs font-bold text-sm tracking-wider">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-600 to-orange-700 flex items-center justify-center text-white shadow-xs font-bold text-sm tracking-wider">
             PB
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-sm text-slate-900 tracking-tight">PhoneBuzz</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">
                 PRO
               </span>
             </div>
@@ -112,7 +120,7 @@ export function LeftSidebar({
                       className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                         isActive
                           ? 'bg-white text-slate-900'
-                          : 'bg-emerald-100 text-emerald-800'
+                          : 'bg-orange-100 text-orange-800'
                       }`}
                     >
                       {item.badge}
@@ -162,7 +170,8 @@ export function LeftSidebar({
           </div>
         </div>
 
-        {/* Administration */}
+        {/* Administration (Admin only) */}
+        {adminNav.length > 0 && (
         <div>
           <div className="px-3 mb-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             Platform
@@ -190,17 +199,18 @@ export function LeftSidebar({
             })}
           </div>
         </div>
+        )}
       </div>
 
       {/* AI Assistant Health Card */}
       <div className="p-3 border-t border-slate-100">
-        <div className="p-3 rounded-xl bg-gradient-to-b from-slate-50 to-emerald-50/40 border border-emerald-100/60">
+        <div className="p-3 rounded-xl bg-gradient-to-b from-slate-50 to-orange-50/40 border border-orange-100/60">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center space-x-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <Sparkles className="w-3.5 h-3.5 text-orange-600" />
               <span className="text-xs font-semibold text-slate-800">Gemini Sales AI</span>
             </div>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
           </div>
           <p className="text-[11px] text-slate-500 leading-tight">
             n8n Automation Active · Syncing real-time wholesale pricing

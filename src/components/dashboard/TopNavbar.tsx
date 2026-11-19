@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Bell, BellOff, Sparkles, ChevronDown, ShieldCheck, FlaskConical } from 'lucide-react';
+import { Search, Bell, BellOff, Sparkles, ChevronDown, ShieldCheck, FlaskConical, LogOut } from 'lucide-react';
+import { roleLabel } from '@/lib/permissions';
 
 interface TopNavbarProps {
   onSearchChange?: (val: string) => void;
   searchValue?: string;
   viewerName?: string;
+  viewerEmail?: string;
   viewerRole?: 'owner' | 'agent';
   demo?: boolean;
   whatsappLive?: boolean;
@@ -20,6 +22,7 @@ export function TopNavbar({
   onSearchChange,
   searchValue = '',
   viewerName = 'Staff',
+  viewerEmail = '',
   viewerRole = 'owner',
   demo = false,
   whatsappLive = false,
@@ -58,11 +61,11 @@ export function TopNavbar({
           </div>
         ) : (
           <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200/80 text-xs">
-            <span className={`w-2 h-2 rounded-full ${whatsappLive ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+            <span className={`w-2 h-2 rounded-full ${whatsappLive ? 'bg-orange-500' : 'bg-rose-500'}`}></span>
             <span className="text-slate-600 font-medium">{whatsappLive ? 'WhatsApp connected' : 'WhatsApp not configured'}</span>
             <span className="text-slate-300">|</span>
             <span className="text-slate-800 font-semibold flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <Sparkles className="w-3.5 h-3.5 text-orange-600" />
               {waitingCount} waiting for human
             </span>
           </div>
@@ -87,27 +90,29 @@ export function TopNavbar({
             </div>
             <div className="hidden md:block text-left">
               <div className="text-xs font-semibold text-slate-900">{viewerName}</div>
-              <div className="text-[10px] text-slate-400 capitalize">{viewerRole}</div>
+              <div className="text-[10px] text-slate-400">{roleLabel(viewerRole)}</div>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
 
           {profileDropdown && (
             <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white border border-slate-200 shadow-xl py-1 text-xs z-50">
-              <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-2 text-slate-700">
-                <ShieldCheck className="w-3.5 h-3.5 text-slate-400" /> Role: <span className="capitalize">{viewerRole}</span>
+              <div className="px-3 py-2 border-b border-slate-100">
+                <div className="font-semibold text-slate-900 truncate">{viewerName}</div>
+                <div className="text-[11px] text-slate-500 truncate">{viewerEmail}</div>
+                <div className="mt-1 flex items-center gap-1.5 text-slate-700">
+                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400" /> {roleLabel(viewerRole)}
+                </div>
               </div>
-              {!demo && (
-                <button
-                  onClick={() => {
-                    setProfileDropdown(false);
-                    onSignOut?.();
-                  }}
-                  className="w-full text-left px-3 py-2 hover:bg-rose-50 text-rose-600 font-medium"
-                >
-                  Sign out
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setProfileDropdown(false);
+                  onSignOut?.();
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-rose-50 text-rose-600 font-medium flex items-center gap-2"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Log out
+              </button>
             </div>
           )}
         </div>

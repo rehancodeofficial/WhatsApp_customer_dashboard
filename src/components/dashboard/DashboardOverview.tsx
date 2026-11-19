@@ -38,16 +38,16 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
       value: stats.activeChats,
       sub: `${stats.unreadMessages} unread messages`,
       icon: MessageSquare,
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-50',
+      color: 'text-orange-600',
+      bg: 'bg-orange-50',
     },
     {
       label: 'AI Sales Handled',
       value: stats.aiHandledConversations,
       sub: 'Automated pricing quotes',
       icon: Bot,
-      color: 'text-teal-600',
-      bg: 'bg-teal-50',
+      color: 'text-orange-600',
+      bg: 'bg-orange-50',
     },
     {
       label: 'Human Takeover',
@@ -62,8 +62,8 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
       value: stats.whatsappConversations,
       sub: 'Meta Cloud API direct',
       icon: MessageSquare,
-      color: 'text-emerald-700',
-      bg: 'bg-emerald-100/60',
+      color: 'text-orange-700',
+      bg: 'bg-orange-100/60',
     },
     {
       label: 'Email Inquiries',
@@ -86,8 +86,8 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
       value: stats.verifiedPaymentCount,
       sub: 'Payment confirmed in full',
       icon: CheckCircle2,
-      color: 'text-emerald-800',
-      bg: 'bg-emerald-100',
+      color: 'text-orange-800',
+      bg: 'bg-orange-100',
     },
   ];
 
@@ -104,7 +104,7 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
 
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-600 shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
             <span className="font-semibold text-slate-800">Dubai HQ (GST)</span>
           </div>
         </div>
@@ -158,7 +158,7 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
                   <div className="flex items-center space-x-3 min-w-0">
                     <div
                       className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs uppercase shrink-0 ${
-                        isEmail ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-800'
+                        isEmail ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-800'
                       }`}
                     >
                       {name?.substring(0, 2) || 'PB'}
@@ -170,7 +170,7 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
                         <span
                           className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
                             c.mode === 'ai'
-                              ? 'bg-emerald-50 text-emerald-700'
+                              ? 'bg-orange-50 text-orange-700'
                               : 'bg-amber-50 text-amber-700'
                           }`}
                         >
@@ -181,7 +181,7 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
                             Email
                           </span>
                         ) : (
-                          <span className="text-[9px] text-emerald-600 font-semibold bg-emerald-50 px-1 rounded">
+                          <span className="text-[9px] text-orange-600 font-semibold bg-orange-50 px-1 rounded">
                             WhatsApp
                           </span>
                         )}
@@ -219,7 +219,7 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
               </div>
               <div className="flex justify-between font-semibold">
                 <span className="text-slate-600">Memory Provider:</span>
-                <span className="text-emerald-700">PostgreSQL Chat Memory</span>
+                <span className="text-orange-700">PostgreSQL Chat Memory</span>
               </div>
               <div className="flex justify-between font-semibold">
                 <span className="text-slate-600">Wholesale Price List:</span>
@@ -233,7 +233,7 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
                 <span>86%</span>
               </div>
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div className="bg-emerald-600 h-full w-[86%] rounded-full"></div>
+                <div className="bg-orange-600 h-full w-[86%] rounded-full"></div>
               </div>
             </div>
 
@@ -243,7 +243,7 @@ export function DashboardOverview({ stats, recentConversations, onOpenChat }: Da
                 <span>100%</span>
               </div>
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div className="bg-teal-600 h-full w-full rounded-full"></div>
+                <div className="bg-orange-600 h-full w-full rounded-full"></div>
               </div>
             </div>
           </div>

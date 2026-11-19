@@ -18,8 +18,11 @@ const messageType = z.preprocess(
 // "+971 50-123 4567" -> "971501234567"
 const waId = z.preprocess((v) => String(v ?? '').replace(/[^0-9]/g, ''), z.string().min(6).max(20));
 
+const party = z.preprocess((v) => (v === '' || v == null ? undefined : String(v).toLowerCase()), z.enum(['customer', 'supplier']).optional());
+
 export const InboundMessageSchema = z.object({
   wa_id: waId,
+  party,
   wa_message_id: z.string().min(1),
   name: optText,
   profile_name: optText,
@@ -37,6 +40,8 @@ export const InboundMessageSchema = z.object({
 
 export const OutboundLogSchema = z.object({
   wa_id: waId,
+  party,
+  name: optText,
   wa_message_id: optText,
   type: messageType,
   body: optText,

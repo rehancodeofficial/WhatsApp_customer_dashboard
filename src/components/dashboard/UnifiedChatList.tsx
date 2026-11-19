@@ -81,7 +81,7 @@ export function UnifiedChatList({
             { id: 'unread', label: 'Unread' },
             { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
             { id: 'email', label: 'Email', icon: Mail },
-            { id: 'human', label: 'Human' },
+            { id: 'human', label: 'Manual' },
             { id: 'ai', label: 'AI' },
             { id: 'starred', label: 'Starred', icon: Star },
           ].map((item) => {
@@ -124,7 +124,7 @@ export function UnifiedChatList({
                 onClick={() => onSelect(conv.id)}
                 className={`p-3.5 flex items-start space-x-3 cursor-pointer transition-all relative ${
                   isSelected
-                    ? 'bg-emerald-50/60 border-l-4 border-emerald-600'
+                    ? 'bg-orange-50/60 border-l-4 border-orange-600'
                     : 'hover:bg-slate-50/80'
                 }`}
               >
@@ -134,7 +134,7 @@ export function UnifiedChatList({
                     className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-xs ${
                       isEmail
                         ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                        : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-orange-100 text-orange-800 border border-orange-200'
                     }`}
                   >
                     {name?.substring(0, 2) || 'PB'}
@@ -143,7 +143,7 @@ export function UnifiedChatList({
                   {/* Channel badge overlay */}
                   <div
                     className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] shadow-xs ${
-                      isEmail ? 'bg-blue-600' : 'bg-emerald-600'
+                      isEmail ? 'bg-blue-600' : 'bg-orange-600'
                     }`}
                     title={isEmail ? 'Email Thread' : 'WhatsApp Chat'}
                   >
@@ -175,7 +175,7 @@ export function UnifiedChatList({
                       {conv.last_message_preview || 'No messages'}
                     </p>
                     {conv.unread_count > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-emerald-600 text-white font-bold text-[10px] shrink-0">
+                      <span className="px-1.5 py-0.5 rounded-full bg-orange-600 text-white font-bold text-[10px] shrink-0">
                         {conv.unread_count}
                       </span>
                     )}
@@ -188,21 +188,18 @@ export function UnifiedChatList({
                       <span
                         className={`inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md font-semibold tracking-wide uppercase ${
                           conv.mode === 'ai'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : conv.mode === 'human'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
                         }`}
                       >
                         {conv.mode === 'ai' && <Bot className="w-2.5 h-2.5" />}
-                        {conv.mode === 'human' && <User className="w-2.5 h-2.5" />}
-                        {conv.mode === 'handoff' && <PauseCircle className="w-2.5 h-2.5" />}
-                        {conv.mode}
+                        {conv.mode !== 'ai' && <User className="w-2.5 h-2.5" />}
+                        {conv.mode === 'ai' ? 'AI' : 'Manual'}
                       </span>
 
                       {/* Payment Badge */}
                       {conv.payment_status === 'verified' && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 font-semibold">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-200 font-semibold">
                           Paid
                         </span>
                       )}
