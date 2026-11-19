@@ -54,8 +54,8 @@ export function CustomersView({
 
   return (
     <div className="h-full flex gap-4 min-h-0">
-      {/* List */}
-      <Card className={cx('w-full lg:w-[360px] shrink-0 flex flex-col min-h-0 p-4', current && 'hidden lg:flex')}>
+      {/* List (Middle column in dashboard) - width set to 380px on desktop for a well-proportioned view */}
+      <Card className={cx('w-full lg:w-[380px] xl:w-[400px] shrink-0 flex flex-col min-h-0 p-4', current && 'hidden lg:flex')}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-800">Customers</h2>
@@ -110,8 +110,8 @@ export function CustomersView({
         </div>
       </Card>
 
-      {/* Detail */}
-      <div className={cx('flex-1 min-w-0 min-h-0', !current && 'hidden lg:block')}>
+      {/* Detail (Right column) - constrained max-width so the middle list has plenty of breathing room */}
+      <div className={cx('flex-1 min-w-0 max-w-4xl min-h-0', !current && 'hidden lg:block')}>
         {current ? (
           <CustomerDetail
             key={current.id}
@@ -368,16 +368,6 @@ function CustomerDetail({
                   >
                     View in Orders Tab ({orders ? orders.length : c.order_count})
                   </Button>
-                  {onOpenOrders && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={onOpenOrders}
-                      title="Navigate to Orders Manager"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" /> All Orders
-                    </Button>
-                  )}
                 </div>
               </div>
 
