@@ -1,10 +1,10 @@
 'use client';
 import { DEFAULT_CURRENCY } from '@/lib/currency';
 import React, { useEffect, useState } from 'react';
-import { ShoppingCart, TrendingUp, Package, Boxes, Clock } from 'lucide-react';
+import { ShoppingCart, TrendingUp, Boxes, Clock } from 'lucide-react';
 import type { InventoryAnalytics, SalesAnalytics } from '@/lib/biz/logic';
 import { api, Card, CardHeader, cx, ErrorNote, Loading, money, num, PillTabs, shortDate, StatusDot, Table, td } from '../ui';
-import { BarList } from '../charts';
+import { LineGraph } from '../LineGraph';
 import { ORDER_STATUS } from './OrdersView';
 
 const RANGES = [
@@ -55,6 +55,19 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
   const pendingOrdersList = orders.filter((o) => o.status === 'pending');
   const paidOrdersList = orders.filter((o) => o.status === 'paid' || o.payment_status === 'paid');
   const displayedOrders = pendingOrdersList.length > 0 ? pendingOrdersList : orders.slice(0, 6);
+
+  // Line graph points for Country and Brand
+  const countryLineData = (s?.byCountry || []).map((c) => ({
+    label: c.country,
+    value: c.revenue,
+    sub: `${c.orders} orders`,
+  }));
+
+  const brandLineData = (s?.byBrand || []).map((b) => ({
+    label: b.brand,
+    value: b.revenue,
+    sub: `${num(b.units)} pcs`,
+  }));
 
   return (
     <div className="h-full overflow-y-auto pr-1">
@@ -173,15 +186,49 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
             </div>
           </div>
 
-          {/* 2 Graphs Side by Side: Sales by Country & Sales by Brand */}
-          <Card className="xl:col-span-6">
-            <CardHeader title="Sales by Country" subtitle="Revenue breakdown by destination" />
-            <BarList rows={s.byCountry.map((c) => ({ label: c.country, value: c.revenue, sub: `${c.orders} orders` }))} max={6} />
+          {/* 2 Line Graphs Side by Side: Sales by Country & Sales by Brand */}
+          <Card className="xl:col-span-6 flex flex-col justify-between">
+            <CardHeader
+              title="Sales by Country"
+              subtitle="Revenue breakdown & destination trend"
+              right={
+                countryLineData.length > 0 && (
+                  <span className="text-xs font-semibold text-slate-700 bg-slate-100 rounded-full px-2.5 py-1">
+                    {money(countryLineData.reduce((acc, c) => acc + c.value, 0), undefined, true)}
+                  </span>
+                )
+              }
+            />
+            <div className="mt-2">
+              <LineGraph
+                data={countryLineData}
+                strokeColor="#f97316"
+                valuePrefix={`${DEFAULT_CURRENCY} `}
+                height={150}
+              />
+            </div>
           </Card>
 
-          <Card className="xl:col-span-6">
-            <CardHeader title="Sales by Brand" subtitle="Revenue contribution by manufacturer" />
-            <BarList rows={s.byBrand.map((b) => ({ label: b.brand, value: b.revenue, sub: `${num(b.units)} pcs` }))} tone="slate" max={6} />
+          <Card className="xl:col-span-6 flex flex-col justify-between">
+            <CardHeader
+              title="Sales by Brand"
+              subtitle="Revenue contribution by manufacturer"
+              right={
+                brandLineData.length > 0 && (
+                  <span className="text-xs font-semibold text-slate-700 bg-slate-100 rounded-full px-2.5 py-1">
+                    {money(brandLineData.reduce((acc, b) => acc + b.value, 0), undefined, true)}
+                  </span>
+                )
+              }
+            />
+            <div className="mt-2">
+              <LineGraph
+                data={brandLineData}
+                strokeColor="#0f172a"
+                valuePrefix={`${DEFAULT_CURRENCY} `}
+                height={150}
+              />
+            </div>
           </Card>
 
           {/* Pending Orders Card */}
