@@ -1,12 +1,12 @@
 // Keeps the n8n Inventory sheet in step with the dashboard and alerts the owner on WhatsApp
 // when a product runs out of stock or is deleted.
 //
-//  - Dashboard edits (any role): the changed rows are written to the Inventory sheet through the
-//    n8n bridge, so the AI (which reads that sheet) sees the new stock at once.
+//  - Dashboard edits (any role): the changed rows are written to the Inventory tab of sheet_rows
+//    (the dashboard's copy of the old Google Sheet), so the AI sees the new stock at once.
 //  - n8n edits (supplier delivery confirmed, stock reserved, ...): arrive through
-//    /api/n8n/sync/Inventory; they only trigger the alerts (the sheet already has them).
-import { canSendRealWhatsApp, n8nBridgeEnabled, OWNER_WHATSAPP_NUMBER } from '@/lib/config';
-import { callN8nBridge } from '@/lib/n8n-bridge';
+//    /api/n8n/sheet/Inventory; they only trigger the alerts (sheet_rows already has them).
+import { canSendRealWhatsApp, isDemoMode, OWNER_WHATSAPP_NUMBER } from '@/lib/config';
+import { upsertByKey } from './sheet-store';
 import { sendMetaWhatsAppMessage } from '@/lib/whatsapp';
 import { getBizStore } from './store';
 import type { Product } from './types';
@@ -43,8 +43,13 @@ async function sheetRow(p: Product, deleted = false) {
 }
 
 async function pushToSheet(p: Product, deleted = false) {
-  if (!n8nBridgeEnabled() || !p.sku) return;
-  await callN8nBridge('inventory_upsert', { row: await sheetRow(p, deleted) });
+  if (isDemoMode() || !p.sku) return;
+  const row = await sheetRow(p, deleted);
+  await upsertByKey('Inventory', 'ID', {
+    ...row,
+    Stock_Status: Number(row.Available_Qty) > 0 ? 'In Stock' : 'Out of Stock',
+    Last_Updated: new Date().toISOString().replace('T', ' ').slice(0, 19),
+  });
 }
 
 /** Bell notification in the dashboard + WhatsApp message to the owner (sent by n8n). */
