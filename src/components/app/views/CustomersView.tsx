@@ -2,14 +2,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, MessageSquare, Plus, ShoppingBag, ExternalLink, Calendar, MapPin, Mail, Phone, CreditCard, Tag } from 'lucide-react';
 import type { CustomerView } from '@/lib/biz/types';
-import type { AIModeEvent, Message } from '@/lib/types';
 import { ExportButton } from '../ExportButton';
 import { BarList } from '../charts';
-import { UnifiedMessageList } from '@/components/dashboard/UnifiedMessageList';
 import { api, Avatar, Button, Card, Chip, ChipSelect, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, PillTabs, SearchInput, shortDate, StatusDot, TierBadge, TIER_LABEL } from '../ui';
 import { ORDER_STATUS } from './OrdersView';
 
-type Tab = 'details' | 'orders' | 'chat';
+type Tab = 'details' | 'orders';
 
 export function CustomersView({
   perms,
@@ -27,6 +25,7 @@ export function CustomersView({
   const [country, setCountry] = useState('all');
   const [sel, setSel] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<'list' | 'insights'>('list');
 
   const load = useCallback(() => {
     api<{ customers: CustomerView[] }>('/api/biz/customers')
@@ -49,20 +48,51 @@ export function CustomersView({
   });
   const current = list?.find((c) => c.id === sel) || null;
 
-  const [view, setView] = useState<'list' | 'insights'>('list');
   if (view === 'insights') return <Insights list={list} onBack={() => setView('list')} />;
 
   return (
-    <div className="h-full flex gap-4 min-h-0">
-      {/* List (Middle column in dashboard) - width set to 380px on desktop for a well-proportioned view */}
-      <Card className={cx('w-full lg:w-[380px] xl:w-[400px] shrink-0 flex flex-col min-h-0 p-4', current && 'hidden lg:flex')}>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">Customers</h2>
-            <p className="text-xs text-slate-500">{list ? `${shown.length} of ${list.length}` : 'Loading'}</p>
+    <div className="h-full flex flex-col min-h-0 gap-3">
+      {/* 1. TOP RECTANGLE BAR: Search, Country, Tiers, Insights, and Add Customer */}
+      <Card className="p-3.5 sm:p-4 shrink-0">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Left section: Title & Counters */}
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-800">Customers</h2>
+              <p className="text-[11px] text-slate-500">{list ? `${shown.length} of ${list.length} records` : 'Loading...'}</p>
+            </div>
+            <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+            {/* Search Input */}
+            <div className="w-full sm:w-64">
+              <SearchInput value={q} onChange={setQ} placeholder="Name, number, brand..." />
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Button size="sm" variant="ghost" onClick={() => setView('insights')}>Insights</Button>
+
+          {/* Right section: Filters (Country, Tier) & Action buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className={cx(inputCls, 'rounded-full py-1.5 text-xs w-36')}
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              aria-label="Country"
+            >
+              <option value="all">All countries</option>
+              {countries.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+
+            <ChipSelect
+              options={['high', 'medium', 'low']}
+              value={tiers}
+              onChange={setTiers}
+              render={(o) => (o === 'high' ? 'High' : o === 'medium' ? 'Mid' : 'Low')}
+            />
+
+            <Button size="sm" variant="ghost" onClick={() => setView('insights')}>
+              Insights
+            </Button>
+
             {perms.has('customers.manage') && (
               <Button size="sm" onClick={() => setAdding(true)}>
                 <Plus className="w-3.5 h-3.5" /> Add
@@ -70,63 +100,64 @@ export function CustomersView({
             )}
           </div>
         </div>
-        <SearchInput value={q} onChange={setQ} placeholder="Name, number, brand" />
-        <div className="flex gap-2 mt-3 items-center">
-          <select className={cx(inputCls, 'rounded-full py-1.5 text-xs w-36')} value={country} onChange={(e) => setCountry(e.target.value)} aria-label="Country">
-            <option value="all">All countries</option>
-            {countries.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-          <ChipSelect options={['high', 'medium', 'low']} value={tiers} onChange={setTiers} render={(o) => (o === 'high' ? 'High' : o === 'medium' ? 'Mid' : 'Low')} />
-        </div>
-        <ErrorNote text={err} />
-        <div className="flex-1 min-h-0 overflow-y-auto -mx-2 mt-3">
-          {!list ? (
-            <Loading />
-          ) : !shown.length ? (
-            <Empty title="No customers match" />
-          ) : (
-            shown.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSel(c.id)}
-                className={cx('w-full flex items-center gap-3 px-2 py-2.5 rounded-2xl text-left transition-colors', sel === c.id ? 'bg-orange-50' : 'hover:bg-slate-50')}
-              >
-                <Avatar name={c.name || c.wa_id} size={44} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-800 truncate">{c.name || `+${c.wa_id}`}</span>
-                    <span className="text-[11px] text-slate-400 shrink-0">{c.last_order_at ? shortDate(c.last_order_at) : ''}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <span className="text-xs text-slate-500 truncate">{c.country || 'Unknown country'} · {c.brands.slice(0, 2).join(', ') || 'no brands yet'}</span>
-                    <TierBadge tier={c.tier} auto={c.tier_auto} />
-                  </div>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
       </Card>
 
-      {/* Detail (Right column) - constrained max-width so the middle list has plenty of breathing room */}
-      <div className={cx('flex-1 min-w-0 max-w-4xl min-h-0', !current && 'hidden lg:block')}>
-        {current ? (
-          <CustomerDetail
-            key={current.id}
-            c={current}
-            perms={perms}
-            onBack={() => setSel(null)}
-            onSaved={load}
-            onOpenInbox={onOpenInbox}
-            onOpenOrders={onOpenOrders}
-          />
-        ) : (
-          <Card className="h-full flex items-center justify-center">
-            <Empty title="Pick a customer" text="Their chat with the AI, orders and record open here." />
-          </Card>
-        )}
+      <ErrorNote text={err} />
+
+      {/* 2. MAIN BOTTOM SECTION: Left List + Right Customer Detail */}
+      <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+        {/* Left: Customer List */}
+        <Card className={cx('w-full lg:w-[360px] xl:w-[380px] shrink-0 flex flex-col min-h-0 p-3', current && 'hidden lg:flex')}>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
+            {!list ? (
+              <Loading />
+            ) : !shown.length ? (
+              <Empty title="No customers match" text="Try resetting search or filters." />
+            ) : (
+              shown.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSel(c.id)}
+                  className={cx(
+                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-colors',
+                    sel === c.id ? 'bg-orange-50 border border-orange-200/80 shadow-xs' : 'hover:bg-slate-50 border border-transparent'
+                  )}
+                >
+                  <Avatar name={c.name || c.wa_id} size={42} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-sm font-semibold text-slate-800 truncate">{c.name || `+${c.wa_id}`}</span>
+                      <span className="text-[10px] text-slate-400 shrink-0">{c.last_order_at ? shortDate(c.last_order_at) : ''}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
+                      <span className="text-xs text-slate-500 truncate">{c.country || 'Unknown country'} · {c.brands.slice(0, 2).join(', ') || 'no brands'}</span>
+                      <TierBadge tier={c.tier} auto={c.tier_auto} />
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </Card>
+
+        {/* Right: Customer Details (Without Chat Tab) */}
+        <div className={cx('flex-1 min-w-0 min-h-0', !current && 'hidden lg:block')}>
+          {current ? (
+            <CustomerDetail
+              key={current.id}
+              c={current}
+              perms={perms}
+              onBack={() => setSel(null)}
+              onSaved={load}
+              onOpenInbox={onOpenInbox}
+              onOpenOrders={onOpenOrders}
+            />
+          ) : (
+            <Card className="h-full flex items-center justify-center text-center p-8">
+              <Empty title="Pick a customer" text="Select a customer from the left list to view their full profile and order history." />
+            </Card>
+          )}
+        </div>
       </div>
 
       {adding && (
@@ -154,21 +185,17 @@ function CustomerDetail({
   perms: Set<string>;
   onBack: () => void;
   onSaved: () => void;
-  onOpenInbox?: (id: string) => void;
+  onOpenInbox?: (conversationId: string) => void;
   onOpenOrders?: () => void;
 }) {
-  const canChat = perms.has('chats.view') && !!c.conversation_id;
-  // Default to details so user sees customer info first, then can view orders
   const [tab, setTab] = useState<Tab>('details');
-  const [messages, setMessages] = useState<Message[] | null>(null);
-  const [events, setEvents] = useState<AIModeEvent[]>([]);
-  const [inquiries, setInquiries] = useState<any[] | null>(null);
-  const [orders, setOrders] = useState<any[] | null>(null);
   const [editing, setEditing] = useState(false);
+  const [orders, setOrders] = useState<any[] | null>(null);
+  const [inquiries, setInquiries] = useState<any[] | null>(null);
   const canOrders = perms.has('orders.view');
+  const canChat = perms.has('chats.view') && !!c.conversation_id;
 
   useEffect(() => {
-    // Load orders immediately so count and order history are always ready
     if (!orders && canOrders) {
       api<{ orders: any[] }>('/api/biz/orders')
         .then((d) => setOrders(d.orders.filter((o) => o.contact_id === c.id)))
@@ -179,34 +206,25 @@ function CustomerDetail({
         .then((d) => setInquiries(d.inquiries))
         .catch(() => setInquiries([]));
     }
-    if (tab === 'chat' && canChat && !messages) {
-      api<{ messages: Message[]; events: AIModeEvent[] }>(`/api/conversations/${c.conversation_id}?markRead=false`)
-        .then((d) => {
-          setMessages(d.messages);
-          setEvents(d.events || []);
-        })
-        .catch(() => setMessages([]));
-    }
-  }, [tab, c, canChat, messages, orders, canOrders, inquiries]);
+  }, [c, orders, canOrders, inquiries]);
 
   const tabs = [
     { id: 'details' as Tab, label: 'Details' },
     ...(perms.has('orders.view') ? [{ id: 'orders' as Tab, label: 'Orders', count: orders ? orders.length : c.order_count }] : []),
-    ...(canChat ? [{ id: 'chat' as Tab, label: 'Chat' }] : []),
   ];
 
   return (
-    <Card className="h-full flex flex-col min-h-0 p-0 overflow-hidden">
-      {/* Header */}
-      <div className="p-4 sm:p-5 border-b border-slate-100">
+    <Card className="h-full flex flex-col min-h-0 p-0 overflow-hidden bg-white">
+      {/* Customer Header Info */}
+      <div className="p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div className="flex items-start gap-3">
-          <button onClick={onBack} className="lg:hidden w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center" aria-label="Back">
+          <button onClick={onBack} className="lg:hidden w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0" aria-label="Back">
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <Avatar name={c.name || c.wa_id} size={52} />
+          <Avatar name={c.name || c.wa_id} size={50} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold text-slate-800 truncate">{c.name || `+${c.wa_id}`}</h2>
+              <h2 className="text-lg font-bold text-slate-800 truncate">{c.name || `+${c.wa_id}`}</h2>
               <TierBadge tier={c.tier} auto={c.tier_auto} />
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -218,57 +236,59 @@ function CustomerDetail({
               ))}
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-1.5">
+          <div className="flex items-center gap-2 shrink-0">
             {canChat && onOpenInbox && (
               <Button size="sm" variant="ghost" onClick={() => onOpenInbox(c.conversation_id!)}>
                 <MessageSquare className="w-3.5 h-3.5" /> Chats
               </Button>
             )}
-            <a href={`https://wa.me/${c.wa_id}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1.5 rounded-full text-xs px-3 py-1.5 font-medium bg-[#25D366] text-white">
+            <a
+              href={`https://wa.me/${c.wa_id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-full text-xs px-3.5 py-1.5 font-semibold bg-[#25D366] text-white hover:bg-[#20ba59] transition-colors"
+            >
               WhatsApp
             </a>
           </div>
         </div>
+
+        {/* Top 3 Stat Cards */}
         <div className="grid grid-cols-3 gap-2 mt-4">
           <Mini label="Total spent" value={money(c.total_spent, undefined, true)} />
           <Mini label="Orders" value={String(c.order_count)} />
           <Mini label="Last order" value={c.last_order_at ? shortDate(c.last_order_at) : '—'} />
         </div>
+
+        {/* Tab pills: Only Details and Orders */}
         <div className="mt-4">
           <PillTabs value={tab} onChange={setTab} items={tabs} />
         </div>
       </div>
 
-      {/* Body */}
-      <div className="flex-1 min-h-0 flex flex-col">
-        {tab === 'chat' &&
-          (messages === null ? (
-            <Loading />
-          ) : messages.length ? (
-            <>
-              <div className="px-4 py-2 text-[11px] text-slate-500 bg-slate-50 border-b border-slate-100">Customer ↔ AI chat (view only).</div>
-              <UnifiedMessageList messages={messages} events={events} party="customer" />
-            </>
-          ) : (
-            <Empty title="No messages yet" />
-          ))}
+      {/* Body: Details or Orders */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {tab === 'orders' && (
-          <div className="p-4 overflow-y-auto">
+          <div className="p-5 space-y-3">
             {!orders ? (
               <Loading />
             ) : !orders.length ? (
-              <Empty title="No orders yet" />
+              <Empty title="No orders yet" text="When this customer places an order, it will appear here." />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {orders.map((o) => (
-                  <div key={o.id} className="rounded-2xl border border-slate-200/70 p-3 flex items-center justify-between gap-3">
+                  <div key={o.id} className="rounded-2xl border border-slate-200/80 p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-slate-800">{o.order_no} <span className="text-slate-400 font-normal text-xs">· {dateTime(o.created_at)}</span></div>
-                      <div className="text-xs text-slate-500 truncate">{o.items.map((i: any) => `${i.quantity}× ${i.description}`).join(', ')}</div>
+                      <div className="text-sm font-semibold text-slate-800">
+                        {o.order_no} <span className="text-slate-400 font-normal text-xs">· {dateTime(o.created_at)}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 truncate mt-0.5">
+                        {o.items.map((i: any) => `${i.quantity}× ${i.description}`).join(', ')}
+                      </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-semibold tabular-nums">{money(o.total)}</div>
-                      <StatusDot color={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS].color} label={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS].label} />
+                      <div className="text-sm font-bold tabular-nums text-slate-900">{money(o.total)}</div>
+                      <StatusDot color={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS]?.color || 'gray'} label={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS]?.label || o.status} />
                     </div>
                   </div>
                 ))}
@@ -276,8 +296,9 @@ function CustomerDetail({
             )}
           </div>
         )}
+
         {tab === 'details' && (
-          <div className="p-5 overflow-y-auto space-y-5 text-sm">
+          <div className="p-5 space-y-5 text-sm">
             {/* Primary Profile Details */}
             <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
@@ -298,125 +319,94 @@ function CustomerDetail({
               <Row k="Customer since" v={shortDate(c.created_at)} />
             </div>
 
-            {/* Business & Commercial Terms */}
+            {/* Commercial & Terms */}
             <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block pb-2 border-b border-slate-200/60">
                 Commercial & Lead Terms
               </span>
               <Row k="Lead ID" v={c.lead_id} />
               <Row k="Lead status" v={c.lead_status} />
-              <Row k="Payment tier" v={`${TIER_LABEL[c.tier]} ${c.tier_auto ? '(automatic, from total spent)' : '(set by hand)'}`} />
+              <Row k="Payment tier" v={`${TIER_LABEL[c.tier]} (${c.tier_auto ? 'automatic, from total spent' : 'manual override'})`} />
               <Row k="Payment method" v={c.payment_method} />
-              {c.offer && (c.offer as any).Offer_Price && (
-                <Row
-                  k="Active offer"
-                  v={`${(c.offer as any).Offer_Currency || ''} ${(c.offer as any).Offer_Price} × ${(c.offer as any).Offer_Qty || ''} · ${(c.offer as any).Offer_Status || ''}`.trim()}
-                />
-              )}
-              <Row k="Brands asked for" v={c.preferred_brands.join(', ')} />
-              <Row k="Brands bought" v={c.brands_bought.join(', ')} />
-              <Row k="Marketing broadcasts" v={c.marketing_opt_in ? 'Opted in (receives updates)' : 'Opted out'} />
-              <Row k="Internal notes" v={c.notes} />
+              <Row k="Last email ID" v={c.last_email_id} />
+              <Row k="Marketing opt-in" v={c.marketing_opt_in ? 'Yes (receives broadcasts)' : 'No (opted out)'} />
             </div>
 
-            {/* Inquiries */}
+            {/* Inquiries Parity */}
+            {inquiries && inquiries.length > 0 && (
+              <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block pb-2 border-b border-slate-200/60">
+                  Recorded Inquiries ({inquiries.length})
+                </span>
+                <div className="space-y-2">
+                  {inquiries.map((inq: any) => (
+                    <div key={inq.id} className="text-xs bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center">
+                      <div>
+                        <div className="font-medium text-slate-800">
+                          {inq.brand} {inq.model} {inq.storage} ({inq.grade} Grade)
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          Qty: {inq.quantity || 1} · {shortDate(inq.created_at)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {inq.quoted_price ? <div className="font-semibold text-slate-700">{money(inq.quoted_price)}</div> : null}
+                        <span className="text-[10px] text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">{inq.status || 'Recorded'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Dedicated Order History Card */}
             <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block pb-2 border-b border-slate-200/60">
-                Product Inquiries History
-              </span>
-              {!inquiries ? (
-                <Loading />
-              ) : !inquiries.length ? (
-                <p className="text-xs text-slate-400">No product inquiries recorded.</p>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <ShoppingBag className="w-3.5 h-3.5" /> Order History ({orders ? orders.length : c.order_count})
+                </span>
+                {perms.has('orders.view') && (
+                  <Button variant="light" size="sm" onClick={() => setTab('orders')}>
+                    View All Orders
+                  </Button>
+                )}
+              </div>
+              {!orders ? (
+                <div className="text-xs text-slate-400 py-2">Loading customer orders...</div>
+              ) : orders.length === 0 ? (
+                <div className="text-xs text-slate-400 py-3 text-center">No orders placed by this customer yet.</div>
               ) : (
-                <div className="space-y-1.5">
-                  {inquiries.map((i) => (
-                    <div key={i.id} className="rounded-xl bg-white border border-slate-200/60 px-3.5 py-2.5 text-xs flex flex-wrap justify-between gap-2 shadow-xs">
-                      <span className="text-slate-800 font-medium">
-                        {[i.brand, i.model, i.storage, i.grade && `Grade ${i.grade}`, i.color].filter(Boolean).join(' ')}
-                        {i.quantity ? ` · ${i.quantity} pcs` : ''}
-                      </span>
-                      <span className="text-slate-500">
-                        {i.quoted_price ? money(i.quoted_price) + ' · ' : ''}
-                        {shortDate(i.created_at)}
-                      </span>
+                <div className="space-y-2">
+                  {orders.slice(0, 3).map((o) => (
+                    <div key={o.id} className="text-xs bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center">
+                      <div>
+                        <div className="font-medium text-slate-800">{o.order_no}</div>
+                        <div className="text-[11px] text-slate-500 truncate max-w-xs">{o.items.map((i: any) => `${i.quantity}× ${i.description}`).join(', ')}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-slate-800">{money(o.total)}</div>
+                        <div className="text-[10px] text-slate-400">{shortDate(o.created_at)}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Order History Section at the bottom with direct Action Button */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-bold">
-                    <ShoppingBag className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Order History</h3>
-                    <p className="text-xs text-slate-500">
-                      {orders ? `${orders.length} orders recorded` : 'Loading orders...'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="light"
-                    onClick={() => setTab('orders')}
-                  >
-                    View in Orders Tab ({orders ? orders.length : c.order_count})
-                  </Button>
-                </div>
+            {/* Internal Notes */}
+            {c.notes && (
+              <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Notes & Inquiries</div>
+                <p className="text-xs text-slate-600 whitespace-pre-wrap">{c.notes}</p>
               </div>
-
-              <div className="pt-3">
-                {!orders ? (
-                  <Loading />
-                ) : !orders.length ? (
-                  <div className="text-center py-6 text-slate-400">
-                    <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-slate-300 stroke-[1.5]" />
-                    <p className="text-sm font-medium text-slate-600">No orders yet</p>
-                    <p className="text-xs text-slate-400 mt-0.5">When this customer places an order, it will appear here.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {orders.map((o) => (
-                      <div
-                        key={o.id}
-                        className="rounded-xl border border-slate-200/70 p-3.5 bg-slate-50/50 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                            <span>{o.order_no}</span>
-                            <span className="text-slate-400 font-normal text-xs">· {dateTime(o.created_at)}</span>
-                          </div>
-                          <div className="text-xs text-slate-500 truncate mt-0.5">
-                            {o.items?.map((i: any) => `${i.quantity}× ${i.description}`).join(', ') || 'No item details'}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-sm font-bold text-slate-900 tabular-nums">{money(o.total)}</div>
-                          <div className="mt-0.5">
-                            <StatusDot
-                              color={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS]?.color || 'gray'}
-                              label={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS]?.label || o.status}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         )}
       </div>
+
       {editing && (
         <CustomerModal
-          customer={c}
+          c={c}
           onClose={() => setEditing(false)}
           onSaved={() => {
             setEditing(false);
@@ -428,47 +418,64 @@ function CustomerDetail({
   );
 }
 
-const Mini = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-2xl bg-slate-50 px-3 py-2">
-    <div className="text-[11px] text-slate-500">{label}</div>
-    <div className="text-sm font-semibold text-slate-800 truncate">{value}</div>
-  </div>
-);
-const Row = ({ k, v }: { k: string; v: string | null | undefined }) => (
-  <div className="flex gap-4">
-    <span className="w-36 shrink-0 text-slate-500">{k}</span>
-    <span className="text-slate-800 whitespace-pre-wrap">{v || '—'}</span>
-  </div>
-);
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 border border-slate-200/70 p-3 min-w-0">
+      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className="text-base sm:text-lg font-bold text-slate-800 truncate mt-0.5">{value}</div>
+    </div>
+  );
+}
 
-function CustomerModal({ customer, onClose, onSaved }: { customer?: CustomerView; onClose: () => void; onSaved: () => void }) {
+function Row({ k, v }: { k: string; v?: string | null }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs py-1 border-b border-slate-100 last:border-none">
+      <span className="text-slate-500 font-medium">{k}</span>
+      <span className="text-slate-800 font-semibold">{v || '—'}</span>
+    </div>
+  );
+}
+
+function CustomerModal({ c, onClose, onSaved }: { c?: CustomerView; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({
-    wa_id: customer?.wa_id || '',
-    name: customer?.name || '',
-    company: customer?.company || '',
-    email: customer?.email || '',
-    country: customer?.country || '',
-    city: customer?.city || '',
-    payment_tier: customer?.payment_tier || '',
-    preferred_brands: (customer?.preferred_brands || []).join(', '),
-    notes: customer?.notes || '',
-    marketing_opt_in: customer?.marketing_opt_in ?? true,
+    name: c?.name || '',
+    wa_id: c?.wa_id || '',
+    email: c?.email || '',
+    company: c?.company || '',
+    country: c?.country || '',
+    city: c?.city || '',
+    delivery_address: c?.delivery_address || '',
+    preferred_language: c?.preferred_language || 'en',
+    notes: c?.notes || '',
+    brands: (c?.brands || []).join(', '),
+    payment_method: c?.payment_method || '',
+    lead_status: c?.lead_status || '',
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setF({ ...f, [k]: e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value });
+
   const save = async () => {
     setBusy(true);
     setErr(null);
-    const body: Record<string, unknown> = {
-      ...f,
-      payment_tier: f.payment_tier || null,
-      preferred_brands: f.preferred_brands.split(',').map((s) => s.trim()).filter(Boolean),
-    };
-    if (customer) delete body.wa_id;
     try {
-      await api(customer ? `/api/biz/customers/${customer.id}` : '/api/biz/customers', { method: customer ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+      const body = {
+        name: f.name.trim() || null,
+        wa_id: f.wa_id.replace(/[^0-9]/g, ''),
+        email: f.email.trim() || null,
+        company: f.company.trim() || null,
+        country: f.country.trim() || null,
+        city: f.city.trim() || null,
+        delivery_address: f.delivery_address.trim() || null,
+        preferred_language: f.preferred_language || 'en',
+        notes: f.notes.trim() || null,
+        brands: f.brands.split(',').map((b) => b.trim()).filter(Boolean),
+        payment_method: f.payment_method.trim() || null,
+        lead_status: f.lead_status.trim() || null,
+      };
+      await api(c ? `/api/biz/customers/${c.id}` : '/api/biz/customers', {
+        method: c ? 'PATCH' : 'POST',
+        body: JSON.stringify(body),
+      });
       onSaved();
     } catch (e: any) {
       setErr(e.message);
@@ -476,62 +483,65 @@ function CustomerModal({ customer, onClose, onSaved }: { customer?: CustomerView
       setBusy(false);
     }
   };
+
   return (
-    <Modal open onClose={onClose} title={customer ? 'Edit customer' : 'Add customer'} wide>
+    <Modal open onClose={onClose} title={c ? `Edit ${c.name || c.wa_id}` : 'New customer'}>
       <ErrorNote text={err} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {!customer && <Field label="WhatsApp number" hint="With country code, e.g. 971501234567"><input className={inputCls} value={f.wa_id} onChange={set('wa_id')} /></Field>}
-        <Field label="Name"><input className={inputCls} value={f.name} onChange={set('name')} /></Field>
-        <Field label="Company"><input className={inputCls} value={f.company} onChange={set('company')} /></Field>
-        <Field label="Email"><input className={inputCls} value={f.email} onChange={set('email')} /></Field>
-        <Field label="Country"><input className={inputCls} value={f.country} onChange={set('country')} /></Field>
-        <Field label="City"><input className={inputCls} value={f.city} onChange={set('city')} /></Field>
-        <Field label="Payment tier" hint="Automatic uses total spent">
-          <select className={inputCls} value={f.payment_tier} onChange={set('payment_tier')}>
-            <option value="">Automatic</option>
-            <option value="high">High paying</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low paying</option>
-          </select>
-        </Field>
-        <Field label="Brands asked for" hint="Comma separated"><input className={inputCls} value={f.preferred_brands} onChange={set('preferred_brands')} placeholder="Apple, Samsung" /></Field>
-        <label className="flex items-center gap-2 text-sm text-slate-700 sm:mt-6">
-          <input type="checkbox" checked={f.marketing_opt_in} onChange={set('marketing_opt_in')} className="accent-orange-500 w-4 h-4" /> Receives broadcasts
-        </label>
-        <div className="sm:col-span-2">
-          <Field label="Notes"><textarea rows={3} className={inputCls} value={f.notes} onChange={set('notes')} /></Field>
+      <div className="space-y-3">
+        <Field label="Full name"><input className={inputCls} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Zehra" /></Field>
+        <Field label="WhatsApp number" hint="Digits with country code, no + or spaces"><input className={inputCls} value={f.wa_id} onChange={(e) => setF({ ...f, wa_id: e.target.value })} placeholder="923398039095" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Email address"><input type="email" className={inputCls} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+          <Field label="Company"><input className={inputCls} value={f.company} onChange={(e) => setF({ ...f, company: e.target.value })} /></Field>
         </div>
-      </div>
-      <div className="flex justify-end mt-5">
-        <Button onClick={save} loading={busy}>Save</Button>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Country"><input className={inputCls} value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })} /></Field>
+          <Field label="City"><input className={inputCls} value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></Field>
+        </div>
+        <Field label="Delivery address"><input className={inputCls} value={f.delivery_address} onChange={(e) => setF({ ...f, delivery_address: e.target.value })} /></Field>
+        <Field label="Preferred brands" hint="Comma-separated (e.g. Apple, Samsung)"><input className={inputCls} value={f.brands} onChange={(e) => setF({ ...f, brands: e.target.value })} /></Field>
+        <Field label="Notes"><input className={inputCls} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+        <div className="flex justify-end gap-2 pt-3">
+          <Button variant="light" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={save} loading={busy} disabled={!f.wa_id.trim()}>Save customer</Button>
+        </div>
       </div>
     </Modal>
   );
 }
 
 function Insights({ list, onBack }: { list: CustomerView[] | null; onBack: () => void }) {
-  if (!list) return <Loading />;
-  const count = (key: (c: CustomerView) => string[]) => {
+  const safe = list || [];
+  const byCountry = useMemo(() => {
     const m = new Map<string, number>();
-    for (const c of list) for (const k of key(c)) m.set(k, (m.get(k) || 0) + 1);
+    for (const c of safe) m.set(c.country || 'Unknown', (m.get(c.country || 'Unknown') || 0) + 1);
     return Array.from(m, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
-  };
-  const fmt = (n: number) => String(Math.round(n));
+  }, [safe]);
+
+  const byBrand = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of safe) for (const b of c.brands) m.set(b, (m.get(b) || 0) + 1);
+    return Array.from(m, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  }, [safe]);
+
   return (
     <div className="h-full overflow-y-auto pr-1">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="w-3.5 h-3.5" /> Customer list</Button>
-        <ExportButton entity="customers" />
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={onBack} className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 font-medium">
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to list
+        </button>
+        <h2 className="text-base font-semibold text-slate-800">Customer Insights</h2>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Card><CardTitle t="Customers by country" /><BarList rows={count((c) => [c.country || 'Unknown'])} format={fmt} /></Card>
-        <Card><CardTitle t="Payment tier" /><BarList rows={count((c) => [TIER_LABEL[c.tier]])} format={fmt} tone="slate" /></Card>
-        <Card><CardTitle t="Brands asked for or bought" /><BarList rows={count((c) => c.brands.length ? c.brands : ['None yet'])} format={fmt} /></Card>
-        <Card><CardTitle t="Lead status" /><BarList rows={count((c) => [c.lead_status || 'Unknown'])} format={fmt} tone="slate" /></Card>
-        <Card><CardTitle t="Top customers by spend" /><BarList rows={[...list].filter((c) => c.total_spent > 0).sort((a, b) => b.total_spent - a.total_spent).map((c) => ({ label: c.name || '+' + c.wa_id, value: c.total_spent, sub: `${c.order_count} orders` }))} format={(n) => money(n, undefined, true)} /></Card>
-        <Card><CardTitle t="Language" /><BarList rows={count((c) => [c.preferred_language || 'Unknown'])} format={fmt} tone="slate" /></Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">Customers by Country</h3>
+          <BarList rows={byCountry} />
+        </Card>
+        <Card>
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">Interest by Brand</h3>
+          <BarList rows={byBrand} tone="slate" />
+        </Card>
       </div>
     </div>
   );
 }
-const CardTitle = ({ t }: { t: string }) => <h3 className="text-[15px] font-semibold text-slate-800 mb-4">{t}</h3>;
