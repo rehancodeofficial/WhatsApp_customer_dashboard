@@ -18,6 +18,17 @@ import {
 } from 'lucide-react';
 import { get24HourWindowStatus } from '@/lib/whatsapp';
 
+function formatCleanLanguage(code?: string | null): string {
+  if (!code) return 'English';
+  const c = code.trim().toLowerCase();
+  if (c === 'roman urdu' || c === 'roman_urdu' || c === 'ur-latn') return 'Roman Urdu';
+  if (c === 'en' || c === 'english') return 'English';
+  if (c === 'ur' || c === 'urdu') return 'Urdu';
+  if (c === 'ar' || c === 'arabic') return 'Arabic';
+  if (c === 'zh' || c === 'chinese') return 'Chinese';
+  return code.charAt(0).toUpperCase() + code.slice(1).toLowerCase();
+}
+
 interface UnifiedChatHeaderProps {
   conversation: Conversation;
   onModeChange: (mode: ConversationMode, resumeMinutes?: number) => Promise<void>;
@@ -80,30 +91,26 @@ export function UnifiedChatHeader({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-bold text-slate-900 tracking-tight">{displayName}</h2>
               {contact?.country && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium border border-slate-200/60">
                   {contact.country}
                 </span>
               )}
-              {isEmail ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
-                  Email Thread
-                </span>
-              ) : (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-semibold">
-                  WhatsApp Direct
-                </span>
-              )}
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-              <span>{isEmail ? contact?.email : `+${contact?.wa_id}`}</span>
-              <span>·</span>
-              <span className="uppercase text-[10px] font-semibold text-slate-400">
-                {contact?.preferred_language || 'EN'}
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1">
+              <span className="font-mono text-slate-600 font-medium">
+                {isEmail ? contact?.email : `+${contact?.wa_id}`}
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="inline-flex items-center gap-1 font-medium text-slate-700 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-full">
+                <span className="text-slate-400 font-normal">Language:</span>
+                <span className="font-semibold text-slate-800">{formatCleanLanguage(contact?.preferred_language)}</span>
               </span>
               {contact?.lead_status && (
                 <>
-                  <span>·</span>
-                  <span className="text-orange-600 font-medium">{contact.lead_status}</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-orange-600 font-semibold bg-orange-50 border border-orange-200/80 px-2 py-0.5 rounded-full">
+                    {contact.lead_status}
+                  </span>
                 </>
               )}
             </div>
