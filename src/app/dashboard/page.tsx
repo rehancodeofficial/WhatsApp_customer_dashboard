@@ -248,7 +248,13 @@ export default function DashboardPage() {
         {section === 'overview' && <OverviewView name={me.viewer.name} perms={perms} onOpen={(s) => setSection(s)} />}
         {section === 'notifications' && <NotificationsView data={notif.data} markRead={notif.markRead} onOpen={openNotificationRow} />}
         {chats}
-        {section === 'customers' && <CustomersView perms={perms} onOpenInbox={(id) => openChat(id, 'customer')} />}
+        {section === 'customers' && (
+          <CustomersView
+            perms={perms}
+            onOpenInbox={(id) => openChat(id, 'customer')}
+            onOpenOrders={() => setSection('orders')}
+          />
+        )}
         {section === 'inventory' && <InventoryView perms={perms} />}
         {section === 'orders' && <OrdersView perms={perms} />}
         {section === 'suppliers' && <SuppliersView perms={perms} />}

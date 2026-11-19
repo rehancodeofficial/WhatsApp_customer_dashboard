@@ -1,6 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, MessageSquare, Plus } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Plus, ShoppingBag, ExternalLink, Calendar, MapPin, Mail, Phone, CreditCard, Tag } from 'lucide-react';
 import type { CustomerView } from '@/lib/biz/types';
 import type { AIModeEvent, Message } from '@/lib/types';
 import { ExportButton } from '../ExportButton';
@@ -9,9 +9,17 @@ import { UnifiedMessageList } from '@/components/dashboard/UnifiedMessageList';
 import { api, Avatar, Button, Card, Chip, ChipSelect, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, PillTabs, SearchInput, shortDate, StatusDot, TierBadge, TIER_LABEL } from '../ui';
 import { ORDER_STATUS } from './OrdersView';
 
-type Tab = 'chat' | 'orders' | 'details';
+type Tab = 'details' | 'orders' | 'chat';
 
-export function CustomersView({ perms, onOpenInbox }: { perms: Set<string>; onOpenInbox?: (conversationId: string) => void }) {
+export function CustomersView({
+  perms,
+  onOpenInbox,
+  onOpenOrders,
+}: {
+  perms: Set<string>;
+  onOpenInbox?: (conversationId: string) => void;
+  onOpenOrders?: () => void;
+}) {
   const [list, setList] = useState<CustomerView[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState('');
@@ -105,7 +113,15 @@ export function CustomersView({ perms, onOpenInbox }: { perms: Set<string>; onOp
       {/* Detail */}
       <div className={cx('flex-1 min-w-0 min-h-0', !current && 'hidden lg:block')}>
         {current ? (
-          <CustomerDetail key={current.id} c={current} perms={perms} onBack={() => setSel(null)} onSaved={load} onOpenInbox={onOpenInbox} />
+          <CustomerDetail
+            key={current.id}
+            c={current}
+            perms={perms}
+            onBack={() => setSel(null)}
+            onSaved={load}
+            onOpenInbox={onOpenInbox}
+            onOpenOrders={onOpenOrders}
+          />
         ) : (
           <Card className="h-full flex items-center justify-center">
             <Empty title="Pick a customer" text="Their chat with the AI, orders and record open here." />
@@ -126,9 +142,24 @@ export function CustomersView({ perms, onOpenInbox }: { perms: Set<string>; onOp
   );
 }
 
-function CustomerDetail({ c, perms, onBack, onSaved, onOpenInbox }: { c: CustomerView; perms: Set<string>; onBack: () => void; onSaved: () => void; onOpenInbox?: (id: string) => void }) {
+function CustomerDetail({
+  c,
+  perms,
+  onBack,
+  onSaved,
+  onOpenInbox,
+  onOpenOrders,
+}: {
+  c: CustomerView;
+  perms: Set<string>;
+  onBack: () => void;
+  onSaved: () => void;
+  onOpenInbox?: (id: string) => void;
+  onOpenOrders?: () => void;
+}) {
   const canChat = perms.has('chats.view') && !!c.conversation_id;
-  const [tab, setTab] = useState<Tab>(canChat ? 'chat' : perms.has('orders.view') ? 'orders' : 'details');
+  // Default to details so user sees customer info first, then can view orders
+  const [tab, setTab] = useState<Tab>('details');
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [events, setEvents] = useState<AIModeEvent[]>([]);
   const [inquiries, setInquiries] = useState<any[] | null>(null);
@@ -137,6 +168,17 @@ function CustomerDetail({ c, perms, onBack, onSaved, onOpenInbox }: { c: Custome
   const canOrders = perms.has('orders.view');
 
   useEffect(() => {
+    // Load orders immediately so count and order history are always ready
+    if (!orders && canOrders) {
+      api<{ orders: any[] }>('/api/biz/orders')
+        .then((d) => setOrders(d.orders.filter((o) => o.contact_id === c.id)))
+        .catch(() => setOrders([]));
+    }
+    if (!inquiries) {
+      api<{ inquiries: any[] }>(`/api/biz/customers/${c.id}`)
+        .then((d) => setInquiries(d.inquiries))
+        .catch(() => setInquiries([]));
+    }
     if (tab === 'chat' && canChat && !messages) {
       api<{ messages: Message[]; events: AIModeEvent[] }>(`/api/conversations/${c.conversation_id}?markRead=false`)
         .then((d) => {
@@ -145,18 +187,12 @@ function CustomerDetail({ c, perms, onBack, onSaved, onOpenInbox }: { c: Custome
         })
         .catch(() => setMessages([]));
     }
-    if (tab === 'orders' && !orders && canOrders) {
-      api<{ orders: any[] }>('/api/biz/orders').then((d) => setOrders(d.orders.filter((o) => o.contact_id === c.id))).catch(() => setOrders([]));
-    }
-    if (tab === 'details' && !inquiries) {
-      api<{ inquiries: any[] }>(`/api/biz/customers/${c.id}`).then((d) => setInquiries(d.inquiries)).catch(() => setInquiries([]));
-    }
   }, [tab, c, canChat, messages, orders, canOrders, inquiries]);
 
   const tabs = [
-    ...(canChat ? [{ id: 'chat' as Tab, label: 'Chat' }] : []),
-    ...(perms.has('orders.view') ? [{ id: 'orders' as Tab, label: 'Orders', count: c.order_count }] : []),
     { id: 'details' as Tab, label: 'Details' },
+    ...(perms.has('orders.view') ? [{ id: 'orders' as Tab, label: 'Orders', count: orders ? orders.length : c.order_count }] : []),
+    ...(canChat ? [{ id: 'chat' as Tab, label: 'Chat' }] : []),
   ];
 
   return (
@@ -241,25 +277,53 @@ function CustomerDetail({ c, perms, onBack, onSaved, onOpenInbox }: { c: Custome
           </div>
         )}
         {tab === 'details' && (
-          <div className="p-5 overflow-y-auto space-y-3 text-sm">
-            <Row k="Lead ID" v={c.lead_id} />
-            <Row k="Payment tier" v={`${TIER_LABEL[c.tier]} ${c.tier_auto ? '(automatic, from total spent)' : '(set by hand)'}`} />
-            <Row k="Delivery address" v={c.delivery_address} />
-            <Row k="Payment method" v={c.payment_method} />
-            {c.offer && (c.offer as any).Offer_Price && (
-              <Row k="Latest offer" v={`${(c.offer as any).Offer_Currency || ''} ${(c.offer as any).Offer_Price} × ${(c.offer as any).Offer_Qty || ''} · ${(c.offer as any).Offer_Status || ''}`.trim()} />
-            )}
-            <Row k="Email" v={c.email} />
-            <Row k="City" v={c.city} />
-            <Row k="Language" v={c.preferred_language} />
-            <Row k="Lead status" v={c.lead_status} />
-            <Row k="Brands asked for" v={c.preferred_brands.join(', ')} />
-            <Row k="Brands bought" v={c.brands_bought.join(', ')} />
-            <Row k="Marketing" v={c.marketing_opt_in ? 'Receives broadcasts' : 'Opted out of broadcasts'} />
-            <Row k="Notes" v={c.notes} />
-            <Row k="Customer since" v={shortDate(c.created_at)} />
-            <div className="pt-2">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">What they asked for</div>
+          <div className="p-5 overflow-y-auto space-y-5 text-sm">
+            {/* Primary Profile Details */}
+            <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Customer Profile</span>
+                {perms.has('customers.manage') && (
+                  <Button variant="light" size="sm" onClick={() => setEditing(true)}>
+                    Edit record
+                  </Button>
+                )}
+              </div>
+              <Row k="Full name" v={c.name} />
+              <Row k="WhatsApp number" v={`+${c.wa_id}`} />
+              <Row k="Email address" v={c.email} />
+              <Row k="Company" v={c.company} />
+              <Row k="Country / City" v={[c.country, c.city].filter(Boolean).join(', ')} />
+              <Row k="Delivery address" v={c.delivery_address} />
+              <Row k="Preferred language" v={c.preferred_language?.toUpperCase()} />
+              <Row k="Customer since" v={shortDate(c.created_at)} />
+            </div>
+
+            {/* Business & Commercial Terms */}
+            <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block pb-2 border-b border-slate-200/60">
+                Commercial & Lead Terms
+              </span>
+              <Row k="Lead ID" v={c.lead_id} />
+              <Row k="Lead status" v={c.lead_status} />
+              <Row k="Payment tier" v={`${TIER_LABEL[c.tier]} ${c.tier_auto ? '(automatic, from total spent)' : '(set by hand)'}`} />
+              <Row k="Payment method" v={c.payment_method} />
+              {c.offer && (c.offer as any).Offer_Price && (
+                <Row
+                  k="Active offer"
+                  v={`${(c.offer as any).Offer_Currency || ''} ${(c.offer as any).Offer_Price} × ${(c.offer as any).Offer_Qty || ''} · ${(c.offer as any).Offer_Status || ''}`.trim()}
+                />
+              )}
+              <Row k="Brands asked for" v={c.preferred_brands.join(', ')} />
+              <Row k="Brands bought" v={c.brands_bought.join(', ')} />
+              <Row k="Marketing broadcasts" v={c.marketing_opt_in ? 'Opted in (receives updates)' : 'Opted out'} />
+              <Row k="Internal notes" v={c.notes} />
+            </div>
+
+            {/* Inquiries */}
+            <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block pb-2 border-b border-slate-200/60">
+                Product Inquiries History
+              </span>
               {!inquiries ? (
                 <Loading />
               ) : !inquiries.length ? (
@@ -267,19 +331,96 @@ function CustomerDetail({ c, perms, onBack, onSaved, onOpenInbox }: { c: Custome
               ) : (
                 <div className="space-y-1.5">
                   {inquiries.map((i) => (
-                    <div key={i.id} className="rounded-xl bg-slate-50 px-3 py-2 text-xs flex flex-wrap justify-between gap-2">
-                      <span className="text-slate-800">{[i.brand, i.model, i.storage, i.grade && `Grade ${i.grade}`, i.color].filter(Boolean).join(' ')}{i.quantity ? ` · ${i.quantity} pcs` : ''}</span>
-                      <span className="text-slate-500">{i.quoted_price ? money(i.quoted_price) + ' · ' : ''}{shortDate(i.created_at)}</span>
+                    <div key={i.id} className="rounded-xl bg-white border border-slate-200/60 px-3.5 py-2.5 text-xs flex flex-wrap justify-between gap-2 shadow-xs">
+                      <span className="text-slate-800 font-medium">
+                        {[i.brand, i.model, i.storage, i.grade && `Grade ${i.grade}`, i.color].filter(Boolean).join(' ')}
+                        {i.quantity ? ` · ${i.quantity} pcs` : ''}
+                      </span>
+                      <span className="text-slate-500">
+                        {i.quoted_price ? money(i.quoted_price) + ' · ' : ''}
+                        {shortDate(i.created_at)}
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            {perms.has('customers.manage') && (
-              <Button variant="light" onClick={() => setEditing(true)}>
-                Edit record
-              </Button>
-            )}
+
+            {/* Order History Section at the bottom with direct Action Button */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-bold">
+                    <ShoppingBag className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">Order History</h3>
+                    <p className="text-xs text-slate-500">
+                      {orders ? `${orders.length} orders recorded` : 'Loading orders...'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="light"
+                    onClick={() => setTab('orders')}
+                  >
+                    View in Orders Tab ({orders ? orders.length : c.order_count})
+                  </Button>
+                  {onOpenOrders && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onOpenOrders}
+                      title="Navigate to Orders Manager"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> All Orders
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-3">
+                {!orders ? (
+                  <Loading />
+                ) : !orders.length ? (
+                  <div className="text-center py-6 text-slate-400">
+                    <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                    <p className="text-sm font-medium text-slate-600">No orders yet</p>
+                    <p className="text-xs text-slate-400 mt-0.5">When this customer places an order, it will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {orders.map((o) => (
+                      <div
+                        key={o.id}
+                        className="rounded-xl border border-slate-200/70 p-3.5 bg-slate-50/50 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                            <span>{o.order_no}</span>
+                            <span className="text-slate-400 font-normal text-xs">· {dateTime(o.created_at)}</span>
+                          </div>
+                          <div className="text-xs text-slate-500 truncate mt-0.5">
+                            {o.items?.map((i: any) => `${i.quantity}× ${i.description}`).join(', ') || 'No item details'}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-bold text-slate-900 tabular-nums">{money(o.total)}</div>
+                          <div className="mt-0.5">
+                            <StatusDot
+                              color={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS]?.color || 'gray'}
+                              label={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS]?.label || o.status}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
