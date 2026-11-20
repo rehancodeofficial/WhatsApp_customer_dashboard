@@ -86,38 +86,59 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
 
       {s && (
         <div className={cx('grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-12 transition-opacity', loading && 'opacity-60')}>
-          {/* 1. Total revenue Card */}
-          <div className="xl:col-span-3 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm text-slate-600 font-medium">Total revenue</span>
-                <span className="text-[10px] text-slate-500 rounded-full border border-slate-200 px-2 py-0.5">{DEFAULT_CURRENCY} · last {days} days</span>
+          {/* 1. Total Revenue + Total Orders stacked in one column */}
+          <div className="xl:col-span-3 flex flex-col gap-3 min-h-[170px]">
+            {/* 1A. Total Revenue */}
+            <div className="flex-1 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs sm:text-sm text-slate-600 font-medium">Total revenue</span>
+                  <span className="text-[10px] text-slate-500 rounded-full border border-slate-200 px-2 py-0.5">{DEFAULT_CURRENCY} · last {days} days</span>
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-2">{money(s.revenue, DEFAULT_CURRENCY)}</div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  {s.revenuePrev ? (
+                    <>
+                      <span className={s.revenue >= s.revenuePrev ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                        {s.revenue >= s.revenuePrev ? '↑' : '↓'} {Math.abs(((s.revenue - s.revenuePrev) / s.revenuePrev) * 100).toFixed(0)}%
+                      </span>{' '}
+                      vs previous {days} days
+                    </>
+                  ) : (
+                    'No sales in the previous period'
+                  )}
+                </div>
               </div>
-              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-2">{money(s.revenue, DEFAULT_CURRENCY)}</div>
-              <div className="text-[11px] text-slate-400 mt-1">
-                {s.revenuePrev ? (
-                  <>
-                    <span className={s.revenue >= s.revenuePrev ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
-                      {s.revenue >= s.revenuePrev ? '↑' : '↓'} {Math.abs(((s.revenue - s.revenuePrev) / s.revenuePrev) * 100).toFixed(0)}%
-                    </span>{' '}
-                    vs previous {days} days
-                  </>
-                ) : (
-                  'No sales in the previous period'
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                {perms.has('orders.view') && (
+                  <button onClick={() => onOpen('orders')} className="rounded-full bg-slate-900 text-white text-xs font-semibold py-2 hover:bg-slate-800 transition-colors">
+                    View orders
+                  </button>
+                )}
+                {perms.has('broadcast.send') && (
+                  <button onClick={() => onOpen('broadcast')} className="rounded-full bg-slate-100 text-slate-700 text-xs font-semibold py-2 hover:bg-slate-200 transition-colors">
+                    New broadcast
+                  </button>
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {perms.has('orders.view') && (
-                <button onClick={() => onOpen('orders')} className="rounded-full bg-slate-900 text-white text-xs font-semibold py-2 hover:bg-slate-800 transition-colors">
-                  View orders
-                </button>
-              )}
-              {perms.has('broadcast.send') && (
-                <button onClick={() => onOpen('broadcast')} className="rounded-full bg-slate-100 text-slate-700 text-xs font-semibold py-2 hover:bg-slate-200 transition-colors">
-                  New broadcast
-                </button>
-              )}
+
+            {/* 1B. Total Orders mini-card */}
+            <div className="bg-white rounded-3xl border border-slate-200/70 px-5 py-4 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-500 font-medium">Total orders</div>
+                <div className="text-xl font-bold tracking-tight text-slate-900 mt-0.5">{num(s.orders)}</div>
+              </div>
+              <div className="flex flex-col items-end gap-1 text-[11px]">
+                <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                  {paidOrdersList.length} completed
+                </span>
+                <span className="flex items-center gap-1 text-amber-600 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>
+                  {s.pendingOrders} pending
+                </span>
+              </div>
             </div>
           </div>
 
@@ -161,44 +182,32 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
             </div>
           </div>
 
-          {/* 3. Orders Card */}
+          {/* 3. Reserved Stock Card (full height, where Orders was) */}
           <div className="xl:col-span-3 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm text-slate-600 font-medium">Orders</span>
-                <span className="w-7 h-7 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center">
-                  <ShoppingCart className="w-3.5 h-3.5 text-slate-600" />
+                <span className="text-xs sm:text-sm text-slate-600 font-medium">Reserved stock</span>
+                <span className="w-7 h-7 rounded-full bg-amber-50 border border-amber-200/80 flex items-center justify-center">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
                 </span>
               </div>
               <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">{num(s.orders)}</span>
-                <span className="text-[11px] text-slate-400 font-medium">total orders</span>
+                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                  {inv ? money(inv.reservedValue, undefined, true) : '—'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">{inv ? `${num(inv.reservedUnits)} units` : ''}</span>
               </div>
-              {/* Separate lines for Completed and Pending */}
               <div className="space-y-1 mt-3 pt-2.5 border-t border-slate-100 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    Completed orders
-                  </span>
-                  <span className="font-semibold text-emerald-700 tabular-nums">{paidOrdersList.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Pending orders
-                  </span>
-                  <span className="font-semibold text-amber-700 tabular-nums">{s.pendingOrders}</span>
+                  <span className="text-slate-500">Paid, awaiting fulfillment</span>
                 </div>
               </div>
             </div>
-            <div className="text-[10px] text-slate-400 mt-2">
-              this period
-            </div>
+            <div className="text-[10px] text-slate-400 mt-2">reserved inventory</div>
           </div>
 
-          {/* 4. Stock value Card */}
-          <div className="xl:col-span-2 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
+          {/* 4. Stock value Card (full height) */}
+          <div className="xl:col-span-3 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm text-slate-600 font-medium">Stock value</span>
@@ -212,7 +221,6 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                 </span>
                 <span className="text-[11px] text-slate-400 font-medium">{inv ? `${num(inv.onHandUnits)} on hand` : ''}</span>
               </div>
-              {/* Owner critical metrics under stock value: Low stock & Out of stock alerts */}
               <div className="space-y-1 mt-3 pt-2.5 border-t border-slate-100 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 flex items-center gap-1.5">
@@ -235,28 +243,6 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
             <div className="text-[10px] text-slate-400 mt-2">
               live inventory
             </div>
-          </div>
-
-          {/* 5. Reserved Stock Card */}
-          <div className="xl:col-span-1 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm text-slate-600 font-medium">Reserved stock</span>
-                <span className="w-7 h-7 rounded-full bg-amber-50 border border-amber-200/80 flex items-center justify-center">
-                  <Clock className="w-3.5 h-3.5 text-amber-600" />
-                </span>
-              </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-                  {inv ? money(inv.reservedValue, undefined, true) : '—'}
-                </span>
-                <span className="text-[11px] text-slate-400 font-medium">{inv ? `${num(inv.reservedUnits)} units` : ''}</span>
-              </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
-                Paid orders awaiting fulfillment
-              </div>
-            </div>
-            <div className="text-[10px] text-slate-400 mt-2">reserved inventory</div>
           </div>
 
           {/* 2 Line Graphs Side by Side: Sales by Country & Sales by Brand */}
