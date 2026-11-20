@@ -262,7 +262,7 @@ export default function DashboardPage() {
         perms={perms}
         user={{ name: me.viewer.name, email: me.viewer.email, roleLabel: me.viewer.roleLabel }}
         badges={{ 'customer-chats': unreadOf('customer'), 'supplier-chats': unreadOf('supplier'), notifications: notif.data?.unread }}
-        bell={perms.has('notifications.view') ? <NotificationBell data={notif.data} onOpen={openNotificationRow} onSeeAll={() => setSection('notifications')} /> : undefined}
+        bell={perms.has('notifications.view') ? <NotificationBell data={notif.data} onOpen={openNotificationRow} onSeeAll={() => setSection('notifications')} markRead={notif.markRead} /> : undefined}
         onSignOut={signOut}
       >
         {section === 'overview' && <OverviewView name={me.viewer.name} perms={perms} onOpen={(s) => setSection(s)} />}

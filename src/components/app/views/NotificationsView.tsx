@@ -46,7 +46,7 @@ function TypeDot({ type }: { type: string }) {
 }
 
 /** Top-bar bell with the latest notifications. */
-export function NotificationBell({ data, onOpen, onSeeAll }: { data: { unread: number; notifications: NotificationRow[] } | null; onOpen: (n: NotificationRow) => void; onSeeAll: () => void }) {
+export function NotificationBell({ data, onOpen, onSeeAll, markRead }: { data: { unread: number; notifications: NotificationRow[] } | null; onOpen: (n: NotificationRow) => void; onSeeAll: () => void; markRead: (ids: string[] | 'all') => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -69,7 +69,17 @@ export function NotificationBell({ data, onOpen, onSeeAll }: { data: { unread: n
         <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto sm:right-0 top-16 sm:top-auto sm:mt-2 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-xl z-40 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <span className="text-sm font-semibold text-slate-800">Notifications</span>
-            <span className="text-xs text-slate-500">{unread} unread</span>
+            <div className="flex items-center gap-2">
+              {unread > 0 && (
+                <button
+                  onClick={() => markRead('all')}
+                  className="text-[11px] font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                >
+                  Mark all as read
+                </button>
+              )}
+              <span className="text-xs text-slate-400">{unread} unread</span>
+            </div>
           </div>
           <div className="max-h-[60vh] overflow-y-auto divide-y divide-slate-100">
             {!data ? (
