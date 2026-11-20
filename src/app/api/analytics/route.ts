@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** Product cost / sale prices in the dashboard currency (inventory is kept in PKR). */
+/** Product cost / sale prices in the dashboard currency (USD). */
 function convertProducts(products: Product[], rates: Record<string, number> | null): Product[] {
   return products.map((p) => {
     const k = (v: number) => toBase(v, p.currency, DEFAULT_CURRENCY, rates);

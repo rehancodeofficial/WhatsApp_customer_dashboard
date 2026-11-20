@@ -93,7 +93,7 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                 <span className="text-xs sm:text-sm text-slate-600 font-medium">Total revenue</span>
                 <span className="text-[10px] text-slate-500 rounded-full border border-slate-200 px-2 py-0.5">{DEFAULT_CURRENCY} · last {days} days</span>
               </div>
-              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-2">{money(s.revenue)}</div>
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-2">{money(s.revenue, DEFAULT_CURRENCY)}</div>
               <div className="text-[11px] text-slate-400 mt-1">
                 {s.revenuePrev ? (
                   <>
@@ -106,18 +106,6 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                   'No sales in the previous period'
                 )}
               </div>
-              {/* Where the revenue comes from, in each order's own currency. */}
-              {((s as any).byCurrency || []).filter((c: any) => c.currency !== DEFAULT_CURRENCY).length > 0 && (
-                <div className="mt-2 space-y-0.5">
-                  {((s as any).byCurrency as { currency: string; total: number; inBase: number; orders: number }[]).map((c) => (
-                    <div key={c.currency} className="text-[11px] text-slate-500 tabular-nums">
-                      {money(c.total, c.currency)}
-                      {c.currency !== DEFAULT_CURRENCY && <> → {money(c.inBase)}</>} · {c.orders} {c.orders === 1 ? 'order' : 'orders'}
-                    </div>
-                  ))}
-                  <div className="text-[10px] text-slate-400">Converted at today's exchange rate</div>
-                </div>
-              )}
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
               {perms.has('orders.view') && (
