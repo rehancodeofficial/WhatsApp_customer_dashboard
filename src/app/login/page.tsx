@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2, Eye, EyeOff, KeyRound, ArrowLeft, CheckCircle2, ShieldCheck, Mail, Send, X } from 'lucide-react';
+import DotField from '@/components/ui/DotField';
 
 const DEMO = [
   { label: 'Admin (full access)', email: 'admin@phonebuzz.demo', password: 'Admin@123' },
@@ -538,8 +539,22 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-sm p-7">
+    <div className="relative min-h-dvh flex items-center justify-center bg-slate-50 px-4 overflow-hidden">
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <DotField
+          lightMode={true}
+          gradientFrom="#f97316"
+          gradientTo="#ea580c"
+          dotRadius={1.5}
+          dotSpacing={16}
+          cursorRadius={260}
+          bulgeStrength={0.5}
+          glowRadius={160}
+          baseOpacity={0.45}
+          interactive={true}
+        />
+      </div>
+      <div className="relative z-10 w-full max-w-sm bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-3xl shadow-xl p-7">
         <div className="flex items-center gap-3 mb-6">
           <img src="/logo.png" alt="Phone Buzz" className="w-12 h-12 rounded-2xl bg-slate-800 p-1" />
           <div>
