@@ -8,7 +8,7 @@ import { CustomerBody, ENTITY_PERMS, MovementBody, OrderBody, ProductBody, Suppl
 import { watchInventory } from '@/lib/biz/inventory-sync';
 import { byCode, nextInventoryId, nextSupplierCode } from '@/lib/biz/ids';
 import { INVENTORY_CURRENCY } from '@/lib/currency';
-import { pushSupplier } from '@/lib/biz/supplier-sync';
+import { pushSupplier, supplierExtras } from '@/lib/biz/supplier-sync';
 import { logActivity } from '@/lib/security';
 
 type Ctx = { params: Promise<{ entity: string }> };
@@ -42,7 +42,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
           c.units += p.stock_qty;
           counts.set(p.supplier_id, c);
         }
-        return NextResponse.json({ suppliers: suppliers.sort((x, y) => byCode(x.code, y.code)).map((s) => ({ ...s, ...(counts.get(s.id) || { skus: 0, units: 0 }) })) });
+        const extras = await supplierExtras();
+        return NextResponse.json({ suppliers: suppliers.sort((x, y) => byCode(x.code, y.code)).map((s) => ({ ...s, ...(extras.get(s.code || '') || {}), ...(counts.get(s.id) || { skus: 0, units: 0 }) })) });
       }
       case 'orders': {
         const [orders, customers, products] = await Promise.all([store.listOrders(), store.listCustomers(), store.listProducts()]);
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
         const code = await nextSupplierCode((await store.listSuppliers()).map((x) => x.code));
         const supplier = await store.saveSupplier(null, { ...(p.data as any), code });
-        await pushSupplier(supplier);
+        await pushSupplier(supplier, p.data);
         await logActivity(v, 'supplier.created', { code: supplier.code, name: supplier.name });
         return NextResponse.json({ supplier });
       }

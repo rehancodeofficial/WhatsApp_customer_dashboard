@@ -33,8 +33,16 @@ export const SupplierBody = z.object({
   rating: z.coerce.number().int().min(1).max(5).nullable().optional(),
   notes: optStr(2000),
   active: z.boolean().optional(),
+  contact_person: optStr(150),
+  preferred_language: optStr(60),
+  // Kept in the AI's supplier record (Suppliers): city, address, payment terms, markets served.
+  city: optStr(80),
+  address: optStr(300),
+  payment_terms: optStr(200),
+  markets: optStr(300),
 });
 export const SupplierPatch = SupplierBody.partial();
+export const SUPPLIER_RECORD_EXTRAS = ['city', 'address', 'payment_terms', 'markets'] as const;
 
 export const ProductBody = z.object({
   /** Left empty on create: the next INV-0001-style ID is given automatically. */

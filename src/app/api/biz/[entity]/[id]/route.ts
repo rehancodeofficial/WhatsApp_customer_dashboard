@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       const p = SupplierPatch.safeParse(body);
       if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
       const supplier = await store.saveSupplier(id, p.data as any);
-      await pushSupplier(supplier);
+      await pushSupplier(supplier, p.data);
       await logActivity(v, 'supplier.updated', { code: supplier.code, fields: Object.keys(p.data) });
       return NextResponse.json({ supplier });
     }

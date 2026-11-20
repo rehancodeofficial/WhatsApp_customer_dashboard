@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, Package, PackagePlus, Pencil, Plus, Wallet } from 'lucide-react';
 import type { InventoryAnalytics } from '@/lib/biz/logic';
 import type { InventoryMovement, Product } from '@/lib/biz/types';
-import { api, Button, Card, CardHeader, Chip, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, num, PageHeader, PillTabs, SearchInput, StatTile, StatusDot, Table, td } from '../ui';
+import { api, Button, Card, CardHeader, Chip, cx, NumInput, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, num, PageHeader, PillTabs, SearchInput, StatTile, StatusDot, Table, td } from '../ui';
 import { BarList, ColumnChart } from '../charts';
 import { ExportButton } from '../ExportButton';
 
@@ -399,11 +399,11 @@ function ProductModal({ product, suppliers, onClose, onSaved }: { product: Produ
             ))}
           </select>
         </Field>
-        <Field label={`Cost price (${product?.currency || INVENTORY_CURRENCY})`}><input type="number" min={0} className={inputCls} value={f.cost_price} onChange={set('cost_price')} /></Field>
-        <Field label={`Sale price (${product?.currency || INVENTORY_CURRENCY})`}><input type="number" min={0} className={inputCls} value={f.sale_price} onChange={set('sale_price')} /></Field>
-        <Field label="Reorder level"><input type="number" min={0} className={inputCls} value={f.reorder_level} onChange={set('reorder_level')} /></Field>
+        <Field label={`Cost price (${product?.currency || INVENTORY_CURRENCY})`}><NumInput value={f.cost_price} onChange={(n) => setF({ ...f, cost_price: n })} placeholder="e.g. 687.50" /></Field>
+        <Field label={`Sale price (${product?.currency || INVENTORY_CURRENCY})`}><NumInput value={f.sale_price} onChange={(n) => setF({ ...f, sale_price: n })} placeholder="e.g. 777.00" /></Field>
+        <Field label="Reorder level"><NumInput decimals={false} value={f.reorder_level} onChange={(n) => setF({ ...f, reorder_level: n })} placeholder="e.g. 10" /></Field>
         <Field label="Location"><input className={inputCls} value={f.location} onChange={set('location')} placeholder="Warehouse A" /></Field>
-        {!product && <Field label="Opening stock" hint="Recorded in the movement log"><input type="number" min={0} className={inputCls} value={f.opening_stock} onChange={set('opening_stock')} /></Field>}
+        {!product && <Field label="Opening stock" hint="Recorded in the movement log"><NumInput decimals={false} value={f.opening_stock} onChange={(n) => setF({ ...f, opening_stock: n })} placeholder="e.g. 50" /></Field>}
         <label className="flex items-center gap-2 text-sm text-slate-700 sm:mt-6">
           <input type="checkbox" checked={f.active} onChange={set('active')} className="accent-orange-500 w-4 h-4" /> Active (can be sold)
         </label>
@@ -444,7 +444,7 @@ function MovementModal({ product, onClose, onSaved }: { product: Product; onClos
         <PillTabs value={type} onChange={setType} items={[{ id: 'in', label: 'Stock in' }, { id: 'out', label: 'Stock out' }, { id: 'return', label: 'Return' }, { id: 'adjustment', label: 'Adjust ±' }]} />
         <div className="grid grid-cols-2 gap-3">
           <Field label={type === 'adjustment' ? 'Change (+/-)' : 'Quantity'}>
-            <input type="number" className={inputCls} value={qty} onChange={(e) => setQty(Number(e.target.value) || 0)} />
+            <NumInput decimals={false} value={qty} onChange={setQty} placeholder="e.g. 20" />
           </Field>
           <Field label="Reference" hint="PO, order no, ...">
             <input className={inputCls} value={ref} onChange={(e) => setRef(e.target.value)} />

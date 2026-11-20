@@ -1,7 +1,7 @@
 'use client';
 // Small UI kit in the PhoneBuzz style: big rounded white cards on a light canvas, dark pill
 // primary buttons, an orange highlight tile, pill tabs, status dots.
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DEFAULT_CURRENCY } from '@/lib/currency';
 import { ArrowDownRight, ArrowUpRight, Loader2, Search, X } from 'lucide-react';
 
@@ -233,6 +233,44 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 
 export const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100';
+
+/**
+ * Number entry as a plain text box: no spinner arrows and no pre-filled "0" (empty means 0).
+ * Only digits (and a dot when `decimals`) can be typed; the parent gets a number.
+ */
+export function NumInput({
+  value,
+  onChange,
+  decimals = true,
+  className,
+  placeholder = '0',
+  ...rest
+}: { value: number | null | undefined; onChange: (n: number) => void; decimals?: boolean } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
+  const show = (v: number | null | undefined) => (v === null || v === undefined || v === 0 || Number.isNaN(v) ? '' : String(v));
+  const [text, setText] = useState(show(value));
+  // Follow outside changes (e.g. a price filled from the product) without fighting the typing.
+  useEffect(() => {
+    if ((Number(text) || 0) !== (value || 0)) setText(show(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <input
+      {...rest}
+      type="text"
+      inputMode={decimals ? 'decimal' : 'numeric'}
+      autoComplete="off"
+      className={cx(inputCls, className)}
+      placeholder={placeholder}
+      value={text}
+      onChange={(e) => {
+        let t = e.target.value.replace(decimals ? /[^0-9.]/g : /[^0-9]/g, '');
+        if (decimals) t = t.replace(/(\..*)\./g, '$1'); // one dot only
+        setText(t);
+        onChange(Number(t) || 0);
+      }}
+    />
+  );
+}
 
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
   useEffect(() => {

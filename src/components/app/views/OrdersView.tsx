@@ -7,6 +7,7 @@ import { ExportButton } from '../ExportButton';
 import { BarList, ColumnChart } from '../charts';
 import { api, Button, Card, Chip, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, PageHeader, PillTabs, SearchInput, StatusDot, Table, td } from '../ui';
 import { contactLabel } from '@/lib/biz/channel';
+import { NumInput } from '../ui';
 
 export const ORDER_STATUS: Record<OrderStatus, { label: string; color: 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'orange' }> = {
   pending: { label: 'Pending', color: 'amber' },
@@ -260,8 +261,8 @@ function NewOrderModal({ customers, products, canPay, onClose, onDone }: { custo
                     </option>
                   ))}
                 </select>
-                <input type="number" min={1} max={p?.stock_qty} className={cx(inputCls, 'col-span-4 sm:col-span-2')} value={l.quantity} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: Math.max(1, Number(e.target.value) || 1) } : x)))} aria-label="Quantity" />
-                <input type="number" min={0} className={cx(inputCls, 'col-span-6 sm:col-span-3')} value={l.unit_price} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, unit_price: Math.max(0, Number(e.target.value) || 0) } : x)))} aria-label="Unit price" />
+                <NumInput decimals={false} className="col-span-4 sm:col-span-2" value={l.quantity} onChange={(n) => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: n } : x)))} placeholder="Qty" aria-label="Quantity" />
+                <NumInput className="col-span-6 sm:col-span-3" value={l.unit_price} onChange={(n) => setLines(lines.map((x, j) => (j === i ? { ...x, unit_price: n } : x)))} placeholder="Price" aria-label="Unit price" />
                 <button className="col-span-2 sm:col-span-1 w-9 h-9 rounded-full hover:bg-rose-50 text-rose-500 flex items-center justify-center disabled:opacity-30" disabled={lines.length === 1} onClick={() => setLines(lines.filter((_, j) => j !== i))} aria-label="Remove line">
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -274,7 +275,7 @@ function NewOrderModal({ customers, products, canPay, onClose, onDone }: { custo
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Field label="Discount ({DEFAULT_CURRENCY})">
-            <input type="number" min={0} className={inputCls} value={discount} onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))} />
+            <NumInput value={discount} onChange={setDiscount} />
           </Field>
           <Field label="Status">
             <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value as OrderStatus)}>
