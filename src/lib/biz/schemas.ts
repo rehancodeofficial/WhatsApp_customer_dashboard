@@ -43,6 +43,7 @@ export const ProductBody = z.object({
   model: str(120).min(1, 'Enter a model'),
   variant: optStr(120),
   condition: z.enum(['new', 'refurbished', 'used']).optional(),
+  grade: z.enum(['A+', 'A', 'B', 'C']).optional(),
   category: str(60).optional(),
   cost_price: money,
   sale_price: money,

@@ -328,13 +328,17 @@ function MovementLog({ movements, products }: { movements: InventoryMovement[] |
   );
 }
 
+/** Phone grades used by Phone Buzz (A+ best). */
+const GRADES = ['A+', 'A', 'B', 'C'] as const;
+
 function ProductModal({ product, suppliers, onClose, onSaved }: { product: Product | null; suppliers: { id: string; name: string }[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({
     sku: product?.sku || '',
     brand: product?.brand || '',
     model: product?.model || '',
     variant: product?.variant || '',
-    condition: product?.condition || 'new',
+    condition: product?.condition || 'refurbished',
+    grade: product?.grade && GRADES.includes(product.grade as (typeof GRADES)[number]) ? product.grade : 'A',
     cost_price: product?.cost_price ?? 0,
     sale_price: product?.sale_price ?? 0,
     reorder_level: product?.reorder_level ?? 10,
@@ -380,12 +384,11 @@ function ProductModal({ product, suppliers, onClose, onSaved }: { product: Produ
         <Field label="Brand"><input className={inputCls} value={f.brand} onChange={set('brand')} placeholder="Apple" /></Field>
         <Field label="Model"><input className={inputCls} value={f.model} onChange={set('model')} placeholder="iPhone 15 Pro" /></Field>
         <Field label="Variant"><input className={inputCls} value={f.variant} onChange={set('variant')} placeholder="256GB Black" /></Field>
-        <Field label="ID"><input className={cx(inputCls, 'bg-slate-50 text-slate-500 font-mono')} value={f.sku || 'Auto (next INV number)'} readOnly title="Given automatically in sequence: INV-0001, INV-0002, ..." /></Field>
-        <Field label="Condition">
-          <select className={inputCls} value={f.condition} onChange={set('condition')}>
-            <option value="new">New</option>
-            <option value="refurbished">Refurbished</option>
-            <option value="used">Used</option>
+        <Field label="Grade">
+          <select className={inputCls} value={f.grade} onChange={set('grade')}>
+            {GRADES.map((g) => (
+              <option key={g} value={g}>Grade {g}</option>
+            ))}
           </select>
         </Field>
         <Field label="Supplier">

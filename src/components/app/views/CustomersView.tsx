@@ -192,7 +192,6 @@ function CustomerDetail({
   const [tab, setTab] = useState<Tab>('details');
   const [editing, setEditing] = useState(false);
   const [orders, setOrders] = useState<any[] | null>(null);
-  const [inquiries, setInquiries] = useState<any[] | null>(null);
   const canOrders = perms.has('orders.view');
   const canChat = perms.has('chats.view') && !!c.conversation_id;
 
@@ -202,12 +201,7 @@ function CustomerDetail({
         .then((d) => setOrders(d.orders.filter((o) => o.contact_id === c.id)))
         .catch(() => setOrders([]));
     }
-    if (!inquiries) {
-      api<{ inquiries: any[] }>(`/api/biz/customers/${c.id}`)
-        .then((d) => setInquiries(d.inquiries))
-        .catch(() => setInquiries([]));
-    }
-  }, [c, orders, canOrders, inquiries]);
+  }, [c, orders, canOrders]);
 
   const tabs = [
     { id: 'details' as Tab, label: 'Details' },
@@ -290,7 +284,7 @@ function CustomerDetail({
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-bold tabular-nums text-slate-900">{money(o.total)}</div>
+                      <div className="text-sm font-bold tabular-nums text-slate-900">{money(o.total, o.currency)}</div>
                       <StatusDot color={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS]?.color || 'gray'} label={ORDER_STATUS[o.status as keyof typeof ORDER_STATUS]?.label || o.status} />
                     </div>
                   </div>
@@ -335,33 +329,6 @@ function CustomerDetail({
               <Row k="Marketing opt-in" v={c.marketing_opt_in ? 'Yes (receives broadcasts)' : 'No (opted out)'} />
             </div>
 
-            {/* Inquiries Parity */}
-            {inquiries && inquiries.length > 0 && (
-              <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block pb-2 border-b border-slate-200/60">
-                  Recorded Inquiries ({inquiries.length})
-                </span>
-                <div className="space-y-2">
-                  {inquiries.map((inq: any) => (
-                    <div key={inq.id} className="text-xs bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center">
-                      <div>
-                        <div className="font-medium text-slate-800">
-                          {inq.brand} {inq.model} {inq.storage} ({inq.grade} Grade)
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          Qty: {inq.quantity || 1} · {shortDate(inq.created_at)}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {inq.quoted_price ? <div className="font-semibold text-slate-700">{money(inq.quoted_price)}</div> : null}
-                        <span className="text-[10px] text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">{inq.status || 'Recorded'}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Dedicated Order History Card */}
             <div className="bg-slate-50/70 border border-slate-200/70 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
@@ -387,7 +354,7 @@ function CustomerDetail({
                         <div className="text-[11px] text-slate-500 truncate max-w-xs">{o.items.map((i: any) => `${i.quantity}× ${i.description}`).join(', ')}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-slate-800">{money(o.total)}</div>
+                        <div className="font-semibold text-slate-800">{money(o.total, o.currency)}</div>
                         <div className="text-[10px] text-slate-400">{shortDate(o.created_at)}</div>
                       </div>
                     </div>

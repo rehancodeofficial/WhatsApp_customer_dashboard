@@ -7,11 +7,20 @@ import { buildCustomerViews, filterAudience, personalize, productLine } from './
 import type { AudienceFilters, Broadcast, CustomerView } from './types';
 import { channelOf } from './channel';
 import { callN8nBridge } from '@/lib/n8n-bridge';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
+import { getRates, toBase } from '@/lib/fx';
 
 export async function loadCustomerViews(): Promise<CustomerView[]> {
   const store = getBizStore();
   const [customers, orders, products, links] = await Promise.all([store.listCustomers(), store.listOrders(), store.listProducts(), store.conversationLinks()]);
-  return buildCustomerViews(customers, orders, products, links);
+  // "Total spent" and tiers add orders up in the dashboard currency (orders can be in PKR, AED, ...).
+  const needs = orders.some((o) => (o.currency || DEFAULT_CURRENCY).toUpperCase() !== DEFAULT_CURRENCY);
+  const rates = needs ? await getRates(DEFAULT_CURRENCY) : null;
+  const inBase = orders.map((o) => {
+    const t = toBase(o.total, o.currency, DEFAULT_CURRENCY, rates);
+    return t === null ? o : { ...o, total: t, currency: DEFAULT_CURRENCY };
+  });
+  return buildCustomerViews(customers, inBase, products, links);
 }
 
 export const MAX_BROADCAST_RECIPIENTS = 1000;

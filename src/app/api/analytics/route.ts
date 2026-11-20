@@ -43,6 +43,22 @@ export async function GET(req: NextRequest) {
         }];
       });
       out.sales = salesAnalytics(inBase, productsInBase, customers, days);
+      // What the revenue is made of, in each order's own currency (shown under "Total revenue").
+      const start = now - days * 86_400_000;
+      const byCur = new Map<string, { currency: string; total: number; inBase: number; orders: number }>();
+      for (const o of orders) {
+        if (o.status === 'cancelled') continue;
+        const t = Date.parse(o.created_at);
+        if (!(t >= start)) continue;
+        const cur = (o.currency || DEFAULT_CURRENCY).toUpperCase();
+        const b = byCur.get(cur) || { currency: cur, total: 0, inBase: 0, orders: 0 };
+        b.total += o.total;
+        b.inBase += toBase(o.total, cur, DEFAULT_CURRENCY, rates) ?? 0;
+        b.orders += 1;
+        byCur.set(cur, b);
+      }
+      (out.sales as any).byCurrency = Array.from(byCur.values()).sort((a, b) => b.inBase - a.inBase);
+      (out.sales as any).rateNote = rates ? Object.fromEntries(Array.from(byCur.keys()).filter((c) => c !== DEFAULT_CURRENCY && rates[c]).map((c) => [c, rates[c]])) : {};
       out.currency = DEFAULT_CURRENCY;
       if (skipped.length) out.notConverted = skipped;
     }

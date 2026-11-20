@@ -106,6 +106,18 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                   'No sales in the previous period'
                 )}
               </div>
+              {/* Where the revenue comes from, in each order's own currency. */}
+              {((s as any).byCurrency || []).filter((c: any) => c.currency !== DEFAULT_CURRENCY).length > 0 && (
+                <div className="mt-2 space-y-0.5">
+                  {((s as any).byCurrency as { currency: string; total: number; inBase: number; orders: number }[]).map((c) => (
+                    <div key={c.currency} className="text-[11px] text-slate-500 tabular-nums">
+                      {money(c.total, c.currency)}
+                      {c.currency !== DEFAULT_CURRENCY && <> → {money(c.inBase)}</>} · {c.orders} {c.orders === 1 ? 'order' : 'orders'}
+                    </div>
+                  ))}
+                  <div className="text-[10px] text-slate-400">Converted at today's exchange rate</div>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
               {perms.has('orders.view') && (
@@ -304,7 +316,7 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                       <td className={cx(td, 'font-medium text-slate-800')}>{o.order_no}</td>
                       <td className={td}>{o.customer?.name || (o.customer ? contactLabel(o.customer) : '—')}</td>
                       <td className={cx(td, 'text-slate-600 max-w-56 truncate')}>{(o.items || []).map((i: any) => `${i.quantity}× ${i.description}`).join(', ')}</td>
-                      <td className={cx(td, 'tabular-nums font-medium')}>{money(o.total)}</td>
+                      <td className={cx(td, 'tabular-nums font-medium')}>{money(o.total, o.currency)}</td>
                       <td className={td}>
                         <StatusDot color={st.color} label={st.label} />
                       </td>
