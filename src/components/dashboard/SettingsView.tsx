@@ -29,7 +29,12 @@ export function SettingsView({ demo }: { demo: boolean; whatsappLive?: boolean }
           ]}
         />
         {tab === 'profile' && <ProfileTab />}
-        {tab === 'security' && <SecurityTab demo={demo} />}
+        {tab === 'security' && (
+          <>
+            <SecurityTab demo={demo} />
+            {!demo && <TrustedDevice />}
+          </>
+        )}
       </div>
     </div>
   );
@@ -326,6 +331,51 @@ function SecurityTab({ demo }: { demo: boolean }) {
             <Button variant="light" onClick={() => setSetup(null)}>Cancel</Button>
           </div>
         </div>
+      )}
+    </Card>
+  );
+}
+
+/** This browser skips the authenticator code for 3 days after "Don't ask again". */
+function TrustedDevice() {
+  const [state, setState] = useState<{ trusted: boolean; until: number | null; days: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    api<{ trusted: boolean; until: number | null; days: number }>('/api/auth/trust').then(setState).catch(() => {});
+  }, []);
+  if (!state) return null;
+  const forget = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api('/api/auth/trust', { method: 'DELETE' });
+      setState({ ...state, trusted: false, until: null });
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card>
+      <CardHeader
+        title="This device"
+        subtitle={`After a correct code you can tick "Don't ask again on this device for ${state.days} days". Changing your password ends this on every device.`}
+        right={state.trusted ? <Chip tone="green">Trusted</Chip> : <Chip>Asks for code</Chip>}
+      />
+      <ErrorNote text={err} />
+      {state.trusted ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-sm text-slate-600">
+            This browser signs in without a code until <b>{new Date(state.until!).toLocaleString()}</b>.
+          </p>
+          <Button variant="light" onClick={forget} loading={busy}>
+            Ask for code again here
+          </Button>
+        </div>
+      ) : (
+        <p className="text-sm text-slate-500">This browser asks for the code at every sign-in (when two-factor is on).</p>
       )}
     </Card>
   );

@@ -6,6 +6,7 @@ import { DEMO_COOKIE, createDemoSession } from '@/lib/demo-session';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { rateLimit } from '@/lib/rate-limit';
+import { passwordEpoch, TRUST_COOKIE, trustOk } from '@/lib/mfa-cookie';
 import { getProfile, ipOf, logActivity, MAX_FAILED_LOGINS, recordFailedLogin, recordSuccessfulLogin, resolveLogin } from '@/lib/security';
 
 // Sign in with the username (or, for older bookmarks, the email).
@@ -63,6 +64,12 @@ export async function POST(req: NextRequest) {
   // Two-factor on: the password was right, now the app code is needed (login step 2).
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+    // "Don't ask again on this device" (3 days): no code needed while the password has not changed.
+    const { data: pc } = await getAdminSupabase().from('profiles').select('password_changed_at').eq('id', data.user.id).maybeSingle();
+    if (await trustOk(req.cookies.get(TRUST_COOKIE)?.value, data.user.id, passwordEpoch(pc?.password_changed_at))) {
+      await logActivity({ id: data.user.id, name: profile.full_name, email, role: profile.role }, 'login.trusted_device', {}, ipAddr);
+      return NextResponse.json({ success: true, role: profile.role, trusted_device: true });
+    }
     // The Admin may use a code sent to the recovery email instead of the app ("Use another method").
     const emailOption = profile.role === 'owner' && !!profile.recovery_email;
     return NextResponse.json({ success: true, mfa_required: true, email_option: emailOption });

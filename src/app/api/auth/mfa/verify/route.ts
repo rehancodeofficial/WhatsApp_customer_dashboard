@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { clean, mfaState, sixDigits } from '@/lib/mfa';
 import { getProfile, ipOf, recordFailedLogin, recordSuccessfulLogin } from '@/lib/security';
+import { rememberDevice } from '@/lib/trust-device';
 
 // Login step 2: { code } from the authenticator app upgrades the session to aal2.
 export async function POST(req: NextRequest) {
@@ -28,5 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Wrong or expired code. Try the current code in the app.' }, { status: 401 });
   }
   await recordSuccessfulLogin(user.user.id);
-  return NextResponse.json({ success: true });
+  const res = NextResponse.json({ success: true });
+  if (body?.remember) await rememberDevice(res, user.user.id);
+  return res;
 }

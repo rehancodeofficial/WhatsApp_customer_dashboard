@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { isDemoMode } from '@/lib/config';
-import { EMAIL_MFA_COOKIE, emailMfaOk } from '@/lib/mfa-cookie';
+import { EMAIL_MFA_COOKIE, emailMfaOk, passwordEpoch, TRUST_COOKIE, trustOk } from '@/lib/mfa-cookie';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { DEMO_COOKIE, readDemoSession } from '@/lib/demo-session';
@@ -33,11 +33,19 @@ export async function getViewer(): Promise<SessionViewer | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
   // Two-factor on, but the 6-digit code not entered yet: not signed in.
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' && !(await emailMfaOk((await cookies()).get(EMAIL_MFA_COOKIE)?.value, user.id))) return null;
-  const { data: profile } = await getAdminSupabase().from('profiles').select('role, role_id, full_name, active, locked_at').eq('id', user.id).maybeSingle();
+  const { data: profile } = await getAdminSupabase().from('profiles').select('role, role_id, full_name, active, locked_at, password_changed_at').eq('id', user.id).maybeSingle();
   if (!profile || profile.active === false) return null; // not staff, or deactivated by an Admin
   if (profile.locked_at) return null; // blocked after 3 wrong passwords
+  // Two-factor on, but no code entered on this sign-in: allowed only with an email code (Admin) or a
+  // trusted device (3 days, ended by a password change).
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+    const jar = await cookies();
+    const ok =
+      (await emailMfaOk(jar.get(EMAIL_MFA_COOKIE)?.value, user.id)) ||
+      (await trustOk(jar.get(TRUST_COOKIE)?.value, user.id, passwordEpoch(profile.password_changed_at)));
+    if (!ok) return null;
+  }
   const role = profile.role === 'owner' ? 'owner' : 'agent';
   const r = role === 'owner' ? null : await getRole(profile.role_id);
   return {

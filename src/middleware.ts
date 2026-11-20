@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { isDemoMode } from '@/lib/config';
-import { EMAIL_MFA_COOKIE, emailMfaOk } from '@/lib/mfa-cookie';
+import { EMAIL_MFA_COOKIE, emailMfaOk, TRUST_COOKIE, trustOk } from '@/lib/mfa-cookie';
 
 const DEMO_COOKIE = 'pb_demo_session';
 
@@ -61,7 +61,11 @@ export async function middleware(request: NextRequest) {
   if (user) {
     // Two-factor on but the code not entered yet: only the login page (code step) is reachable.
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const needsCode = aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' && !(await emailMfaOk(request.cookies.get(EMAIL_MFA_COOKIE)?.value, user.id));
+    const needsCode =
+      aal?.nextLevel === 'aal2' &&
+      aal.currentLevel !== 'aal2' &&
+      !(await emailMfaOk(request.cookies.get(EMAIL_MFA_COOKIE)?.value, user.id)) &&
+      !(await trustOk(request.cookies.get(TRUST_COOKIE)?.value, user.id)); // password check is done by getViewer
     if (needsCode) {
       if (open) return response;
       if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Enter your two-factor code' }, { status: 401 });

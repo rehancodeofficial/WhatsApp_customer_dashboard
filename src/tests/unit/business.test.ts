@@ -198,3 +198,21 @@ describe('email sign-in code cookie', () => {
     expect(await emailMfaOk(undefined, 'user-1')).toBe(false);
   });
 });
+
+import { makeTrustCookie, passwordEpoch, trustOk } from '@/lib/mfa-cookie';
+describe('trusted device (3 days)', () => {
+  it('works for the same user and password, and ends when the password changes', async () => {
+    process.env.PASSWORD_VAULT_KEY = 'test-key';
+    const epoch = passwordEpoch('2026-11-20T10:00:00Z');
+    const c = await makeTrustCookie('user-1', epoch);
+    expect(await trustOk(c, 'user-1', epoch)).toBe(true);
+    expect(await trustOk(c, 'user-1')).toBe(true); // middleware: no password check
+    expect(await trustOk(c, 'user-2', epoch)).toBe(false);
+    expect(await trustOk(c, 'user-1', passwordEpoch('2026-11-21T10:00:00Z'))).toBe(false); // new password
+    const p = c.split('.');
+    expect(await trustOk([p[0], String(Date.now() + 99 * 86_400_000), p[2], p[3], p[4]].join('.'), 'user-1')).toBe(false); // longer than 3 days
+    const exp = Number(p[1]);
+    expect(exp - Date.now()).toBeLessThanOrEqual(3 * 86_400_000);
+    expect(exp - Date.now()).toBeGreaterThan(3 * 86_400_000 - 5000);
+  });
+});

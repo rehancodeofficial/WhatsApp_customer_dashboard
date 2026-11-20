@@ -78,6 +78,15 @@ function Choice({ icon, title, text, onClick }: { icon: React.ReactNode; title: 
   );
 }
 
+function RememberBox({ checked, onChange, id }: { checked: boolean; onChange: (v: boolean) => void; id: string }) {
+  return (
+    <label htmlFor={id} className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+      Don't ask again on this device for 3 days
+    </label>
+  );
+}
+
 function LoginForm() {
   const params = useSearchParams();
   const [mode, setMode] = useState<Mode>(params.get('mfa') === '1' ? 'mfa' : 'login');
@@ -98,6 +107,8 @@ function LoginForm() {
   const [recovery, setRecovery] = useState('');
   const [emailCodeSentTo, setEmailCodeSentTo] = useState<string | null>(null);
   const [emailCode, setEmailCode] = useState('');
+  // "Don't ask again on this device for 3 days" (on by default).
+  const [remember, setRemember] = useState(true);
   // forgot password
   const [opts, setOpts] = useState<ForgotOptions | null>(null);
   const [reason, setReason] = useState('');
@@ -159,7 +170,7 @@ function LoginForm() {
   const verifyApp = (e: React.FormEvent) => {
     e.preventDefault();
     return run(async () => {
-      const r = await post('/api/auth/mfa/verify', { code });
+      const r = await post('/api/auth/mfa/verify', { code, remember });
       if (!r.ok) {
         setError(r.data.error || 'Wrong code');
         if (r.status === 401 && /expired/i.test(r.data.error || '')) go('login');
@@ -182,7 +193,7 @@ function LoginForm() {
   const verifyEmailCode = (e: React.FormEvent) => {
     e.preventDefault();
     return run(async () => {
-      const r = await post('/api/auth/mfa/email/verify', { code: emailCode });
+      const r = await post('/api/auth/mfa/email/verify', { code: emailCode, remember });
       if (!r.ok) return setError(r.data.error || 'Wrong code');
       goNext();
     });
@@ -282,6 +293,7 @@ function LoginForm() {
           <Label htmlFor="code">Authenticator code</Label>
           <input id="code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={7} required value={code} onChange={(e) => setCode(digits(e.target.value))} placeholder="123 456" className={codeField} />
         </div>
+        <RememberBox id="remember-app" checked={remember} onChange={setRemember} />
         {err}
         <button type="submit" disabled={busy || !six(code)} className={primary}>
           {busy && <Loader2 className="w-4 h-4 animate-spin" />} Verify and sign in
@@ -332,6 +344,7 @@ function LoginForm() {
                 We sent a 6-digit code to <b>{emailCodeSentTo}</b>. It expires in 10 minutes. Check the spam folder too.
               </p>
               <input id="ecode" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={7} required value={emailCode} onChange={(e) => setEmailCode(digits(e.target.value))} placeholder="123 456" className={codeField} />
+              <RememberBox id="remember-email" checked={remember} onChange={setRemember} />
               {err}
               <button type="submit" disabled={busy || !six(emailCode)} className={primary}>
                 {busy && <Loader2 className="w-4 h-4 animate-spin" />} Verify and sign in
