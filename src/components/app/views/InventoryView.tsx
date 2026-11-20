@@ -157,26 +157,92 @@ function Analytics({ a, days, setDays }: { a: InventoryAnalytics | null; days: '
 function StockTable({ products, suppliers, canManage, onEdit, onMove }: { products: Product[] | null; suppliers: { id: string; name: string }[]; canManage: boolean; onEdit: (p: Product) => void; onMove: (p: Product) => void }) {
   const [q, setQ] = useState('');
   const [brand, setBrand] = useState('all');
+  const [country, setCountry] = useState('all');
+  const [grade, setGrade] = useState('all');
+  const [storage, setStorage] = useState('all');
+  const [stock, setStock] = useState<'all' | 'in' | 'low' | 'out'>('all');
   const sup = new Map(suppliers.map((s) => [s.id, s.name]));
-  const brands = useMemo(() => Array.from(new Set((products || []).map((p) => p.brand))).sort(), [products]);
-  const rows = (products || [])
-    .filter((p) => (brand === 'all' || p.brand === brand) && (!q || `${p.sku} ${p.brand} ${p.model} ${p.variant}`.toLowerCase().includes(q.toLowerCase())))
+  const list = products || [];
+  const uniq = (vals: (string | null | undefined)[]) =>
+    Array.from(new Set(vals.map((v) => (v || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  // Market_Region is a list ("UAE, Pakistan, ..."): the countries this product may be sold to.
+  const countriesOf = (p: Product) => (p.market_region || '').split(/[,;/|]+/).map((c) => c.trim()).filter(Boolean);
+  const brands = useMemo(() => uniq(list.map((p) => p.brand)), [products]);
+  const countries = useMemo(() => uniq(list.flatMap(countriesOf)), [products]);
+  const grades = useMemo(() => uniq(list.map((p) => p.grade || p.condition)), [products]);
+  const storages = useMemo(() => uniq(list.map((p) => p.storage)), [products]);
+  const avail = (p: Product) => p.stock_qty - (p.reserved_qty || 0);
+  const rows = list
+    .filter((p) => {
+      if (brand !== 'all' && p.brand !== brand) return false;
+      if (country !== 'all' && !countriesOf(p).some((c) => c.toLowerCase() === country.toLowerCase())) return false;
+      if (grade !== 'all' && (p.grade || p.condition) !== grade) return false;
+      if (storage !== 'all' && (p.storage || '') !== storage) return false;
+      if (stock === 'in' && !(p.active && avail(p) > 0)) return false;
+      if (stock === 'out' && !(avail(p) <= 0 || !p.active)) return false;
+      if (stock === 'low' && !(p.active && avail(p) > 0 && p.stock_qty <= p.reorder_level)) return false;
+      return !q || `${p.sku} ${p.brand} ${p.model} ${p.variant}`.toLowerCase().includes(q.toLowerCase());
+    })
     .sort((a, b) => a.sku.localeCompare(b.sku, undefined, { numeric: true }));
+  const filtered = brand !== 'all' || country !== 'all' || grade !== 'all' || storage !== 'all' || stock !== 'all' || !!q;
+  const clear = () => {
+    setBrand('all');
+    setCountry('all');
+    setGrade('all');
+    setStorage('all');
+    setStock('all');
+    setQ('');
+  };
+  const sel = cx(inputCls, 'rounded-full');
   return (
     <Card>
-      <div className="flex flex-col sm:flex-row gap-3 justify-between mb-4">
-        <select className={cx(inputCls, 'sm:w-48 rounded-full')} value={brand} onChange={(e) => setBrand(e.target.value)} aria-label="Brand">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
+        <select className={sel} value={country} onChange={(e) => setCountry(e.target.value)} aria-label="Country">
+          <option value="all">All countries</option>
+          {countries.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
+        <select className={sel} value={brand} onChange={(e) => setBrand(e.target.value)} aria-label="Brand">
           <option value="all">All brands</option>
           {brands.map((b) => (
             <option key={b}>{b}</option>
           ))}
         </select>
-        <SearchInput value={q} onChange={setQ} placeholder="SKU, brand, model" />
+        <select className={sel} value={grade} onChange={(e) => setGrade(e.target.value)} aria-label="Grade">
+          <option value="all">All grades</option>
+          {grades.map((g) => (
+            <option key={g} value={g}>Grade {g}</option>
+          ))}
+        </select>
+        <select className={sel} value={storage} onChange={(e) => setStorage(e.target.value)} aria-label="Storage">
+          <option value="all">All storage</option>
+          {storages.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+        <select className={sel} value={stock} onChange={(e) => setStock(e.target.value as typeof stock)} aria-label="Stock">
+          <option value="all">All stock</option>
+          <option value="in">In stock</option>
+          <option value="low">Low stock</option>
+          <option value="out">Out of stock</option>
+        </select>
+        <SearchInput value={q} onChange={setQ} placeholder="ID, brand, model" />
       </div>
+      {filtered && (
+        <div className="flex items-center justify-between mb-3 text-xs text-slate-500">
+          <span>
+            {rows.length} of {list.length} products
+          </span>
+          <button onClick={clear} className="font-medium text-orange-600 hover:text-orange-700">
+            Clear filters
+          </button>
+        </div>
+      )}
       {!products ? (
         <Loading />
       ) : !rows.length ? (
-        <Empty title="No products" text="Add your first product to start tracking stock." />
+        filtered ? <Empty title="No products match these filters" text="Change or clear the filters." /> : <Empty title="No products" text="Add your first product to start tracking stock." />
       ) : (
         <Table head={['ID', 'Product', 'Grade', 'Cost', 'Price', 'On hand', 'Reserved', 'Available', 'Supplier', 'Status', '']} minWidth={1000}>
           {rows.map((p) => {
@@ -195,7 +261,7 @@ function StockTable({ products, suppliers, canManage, onEdit, onMove }: { produc
                 <td className={cx(td, 'tabular-nums text-slate-600')}>{num(p.reserved_qty || 0)}</td>
                 <td className={cx(td, 'tabular-nums')}>{num(p.stock_qty - (p.reserved_qty || 0))}</td>
                 <td className={cx(td, 'text-slate-600')}>{(p.supplier_id && sup.get(p.supplier_id)) || '—'}</td>
-                <td className={td}>{!p.active ? <StatusDot color="gray" label="Inactive" /> : low ? <StatusDot color="red" label="Low stock" /> : <StatusDot color="green" label="In stock" />}</td>
+                <td className={td}>{!p.active ? <StatusDot color="gray" label="Inactive" /> : avail(p) <= 0 ? <StatusDot color="red" label="Out of stock" /> : low ? <StatusDot color="amber" label="Low stock" /> : <StatusDot color="green" label="In stock" />}</td>
                 <td className={cx(td, 'whitespace-nowrap text-right')}>
                   {canManage && (
                     <>

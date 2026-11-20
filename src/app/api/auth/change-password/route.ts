@@ -4,8 +4,9 @@ import { z } from 'zod';
 import { getViewer } from '@/lib/auth';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { rateLimit } from '@/lib/rate-limit';
+import { requireCodeIfEnabled } from '@/lib/mfa';
 
-const Body = z.object({ current: z.string().min(1, 'Enter your current password').max(200), password: z.string().min(8, 'New password: at least 8 characters').max(200) });
+const Body = z.object({ current: z.string().min(1, 'Enter your current password').max(200), password: z.string().min(8, 'New password: at least 8 characters').max(200), code: z.string().max(10).optional() });
 
 // Settings → Profile → Change password (checks the current password first).
 export async function POST(req: NextRequest) {
@@ -18,6 +19,9 @@ export async function POST(req: NextRequest) {
   const check = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const { error: bad } = await check.auth.signInWithPassword({ email: v.email, password: p.data.current });
   if (bad) return NextResponse.json({ error: 'Current password is wrong' }, { status: 400 });
+  // Two-factor on: also needs a current authenticator code.
+  const codeErr = await requireCodeIfEnabled(p.data.code);
+  if (codeErr) return NextResponse.json({ error: codeErr, code_required: true }, { status: 403 });
   const { error } = await getAdminSupabase().auth.admin.updateUserById(v.id, { password: p.data.password });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ success: true });

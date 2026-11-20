@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getViewer } from '@/lib/auth';
 import { isDemoMode } from '@/lib/config';
 import { getAdminSupabase } from '@/lib/supabase/admin';
+import { requireCodeIfEnabled } from '@/lib/mfa';
 
 // Settings → Profile: own name, and (Admin only) the recovery email for password reset links.
 export async function GET() {
@@ -16,6 +17,7 @@ export async function GET() {
 const Body = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(120).optional(),
   recovery_email: z.union([z.string().trim().email('Enter a valid recovery email'), z.literal('')]).optional(),
+  code: z.string().max(10).optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -24,6 +26,9 @@ export async function PATCH(req: NextRequest) {
   const p = Body.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ error: p.error.issues[0]?.message }, { status: 400 });
   if (isDemoMode()) return NextResponse.json({ success: true });
+  // Two-factor on: any profile change needs a current authenticator code.
+  const codeErr = await requireCodeIfEnabled(p.data.code);
+  if (codeErr) return NextResponse.json({ error: codeErr, code_required: true }, { status: 403 });
   const patch: Record<string, unknown> = {};
   if (p.data.name !== undefined) patch.full_name = p.data.name;
   if (p.data.recovery_email !== undefined) {

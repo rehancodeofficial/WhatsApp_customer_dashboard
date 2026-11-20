@@ -19,3 +19,16 @@ export async function mfaState() {
 
 export const sixDigits = (v: unknown) => /^\d{6}$/.test(String(v ?? '').replace(/\s/g, ''));
 export const clean = (v: unknown) => String(v ?? '').replace(/\s/g, '');
+
+/**
+ * Step-up check for sensitive changes (password, profile): when two-factor sign-in is on,
+ * the request must carry a current 6-digit code from the authenticator app.
+ * Returns an error message, or null when the change may go ahead.
+ */
+export async function requireCodeIfEnabled(code: unknown): Promise<string | null> {
+  const s = await mfaState();
+  if (!s.enabled || !s.factorId) return null;
+  if (!sixDigits(code)) return 'Enter the 6-digit code from Microsoft Authenticator to save this change.';
+  const { error } = await s.supabase.auth.mfa.challengeAndVerify({ factorId: s.factorId, code: clean(code) });
+  return error ? 'Wrong or expired authenticator code. Try the current code in the app.' : null;
+}

@@ -45,6 +45,31 @@ function Saved({ text }: { text: string | null }) {
   );
 }
 
+/** Two-factor on? Then profile and password changes need a code from the app. */
+function useMfaOn() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    api<{ enabled: boolean }>('/api/auth/mfa').then((d) => setOn(!!d.enabled)).catch(() => {});
+  }, []);
+  return on;
+}
+
+function CodeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <Field label="Authenticator code" hint="Two-factor is on: enter the current 6-digit code from Microsoft Authenticator to save.">
+      <input
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={7}
+        className={inputCls + ' font-mono tracking-[0.3em] text-center sm:w-40'}
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/[^0-9 ]/g, ''))}
+        placeholder="123 456"
+      />
+    </Field>
+  );
+}
+
 function ProfileTab() {
   const [p, setP] = useState<Profile | null>(null);
   const [name, setName] = useState('');
@@ -52,6 +77,8 @@ function ProfileTab() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const mfaOn = useMfaOn();
+  const [code, setCode] = useState('');
 
   useEffect(() => {
     api<Profile>('/api/me/profile')
@@ -70,7 +97,9 @@ function ProfileTab() {
     try {
       const body: Record<string, string> = { name };
       if (p?.role === 'owner') body.recovery_email = recovery.trim();
+      if (mfaOn) body.code = code;
       await api('/api/me/profile', { method: 'PATCH', body: JSON.stringify(body) });
+      setCode('');
       setOk('Profile saved.');
     } catch (e: any) {
       setErr(e.message);
@@ -100,8 +129,9 @@ function ProfileTab() {
               </div>
             </Field>
           )}
+          {mfaOn && <CodeField value={code} onChange={setCode} />}
           <div className="flex justify-end">
-            <Button onClick={save} loading={busy} disabled={!p}>
+            <Button onClick={save} loading={busy} disabled={!p || (mfaOn && code.replace(/\s/g, '').length !== 6)}>
               Save profile
             </Button>
           </div>
@@ -114,6 +144,8 @@ function ProfileTab() {
 
 function ChangePassword() {
   const [f, setF] = useState({ current: '', password: '', repeat: '' });
+  const mfaOn = useMfaOn();
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -124,8 +156,9 @@ function ChangePassword() {
     if (f.password !== f.repeat) return setErr('The two new passwords are not the same.');
     setBusy(true);
     try {
-      await api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ current: f.current, password: f.password }) });
+      await api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ current: f.current, password: f.password, ...(mfaOn ? { code } : {}) }) });
       setF({ current: '', password: '', repeat: '' });
+      setCode('');
       setOk('Password changed.');
     } catch (e: any) {
       setErr(e.message);
@@ -143,8 +176,13 @@ function ChangePassword() {
         <Field label="New password"><input type="password" autoComplete="new-password" className={inputCls} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
         <Field label="Repeat new password"><input type="password" autoComplete="new-password" className={inputCls} value={f.repeat} onChange={(e) => setF({ ...f, repeat: e.target.value })} /></Field>
       </div>
+      {mfaOn && (
+        <div className="mt-3">
+          <CodeField value={code} onChange={setCode} />
+        </div>
+      )}
       <div className="flex justify-end mt-3">
-        <Button onClick={save} loading={busy} disabled={!f.current || !f.password}>
+        <Button onClick={save} loading={busy} disabled={!f.current || !f.password || (mfaOn && code.replace(/\s/g, '').length !== 6)}>
           <KeyRound className="w-4 h-4" /> Change password
         </Button>
       </div>
