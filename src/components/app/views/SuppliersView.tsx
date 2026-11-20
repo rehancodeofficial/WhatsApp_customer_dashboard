@@ -341,21 +341,25 @@ export function SuppliersView({ perms }: { perms: Set<string> }) {
         ) : !shown.length ? (
           <Empty title="No suppliers match your search" text="Try clearing search filters or add a new supplier." />
         ) : (
-          <Table head={['Supplier', 'Phone', 'Email', 'Country', 'Brands', 'Products', 'Units in stock', 'Rating', 'Status', '']} minWidth={900}>
+          <Table head={['Supplier ID', 'Supplier', 'Phone', 'Email', 'Country', 'Brands', 'Products', 'Units in stock', 'Rating', 'Status', '']} minWidth={980}>
             {shown.map((s) => (
               <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
-                {/* 1. Supplier Name & Code */}
+                {/* 0. Supplier ID (SUP-001, SUP-002, ...) */}
+                <td className={cx(td, 'whitespace-nowrap')}>
+                  {s.code ? (
+                    <span className="text-xs font-mono font-semibold text-slate-700 bg-slate-100 rounded-md px-2 py-1">{s.code}</span>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
+                </td>
+
+                {/* 1. Supplier Name */}
                 <td className={td}>
                   <div className="flex items-center gap-3">
                     <Avatar name={s.name} size={36} />
                     <div>
                       <div className="font-semibold text-slate-800 flex items-center gap-1.5">
                         {s.name}
-                        {s.code && (
-                          <span className="text-[10px] text-slate-400 font-mono bg-slate-100 rounded px-1.5 py-0.5">
-                            {s.code}
-                          </span>
-                        )}
                       </div>
                       {s.company && s.company !== s.name && (
                         <div className="text-[11px] text-slate-500 truncate max-w-xs">{s.company}</div>

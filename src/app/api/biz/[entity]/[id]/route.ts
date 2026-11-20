@@ -5,6 +5,7 @@ import { getBizStore } from '@/lib/biz/store';
 import { bizError } from '@/lib/biz/http';
 import { CustomerPatch, ENTITY_PERMS, OrderPatch, ProductPatch, SupplierPatch, zodMessage } from '@/lib/biz/schemas';
 import { onProductDeleted, watchInventory } from '@/lib/biz/inventory-sync';
+import { pushSupplier, removeSupplier } from '@/lib/biz/supplier-sync';
 
 type Ctx = { params: Promise<{ entity: string; id: string }> };
 
@@ -53,7 +54,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if (entity === 'suppliers') {
       const p = SupplierPatch.safeParse(body);
       if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
-      return NextResponse.json({ supplier: await store.saveSupplier(id, p.data as any) });
+      const supplier = await store.saveSupplier(id, p.data as any);
+      await pushSupplier(supplier);
+      return NextResponse.json({ supplier });
     }
     const p = ProductPatch.safeParse(body);
     if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
@@ -73,7 +76,11 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
       const product = (await getBizStore().listProducts()).find((p) => p.id === id);
       await getBizStore().deleteProduct(id);
       if (product) await onProductDeleted(product);
-    } else await getBizStore().deleteSupplier(id);
+    } else {
+      const supplier = (await getBizStore().listSuppliers()).find((x) => x.id === id);
+      await getBizStore().deleteSupplier(id);
+      await removeSupplier(supplier?.code);
+    }
     return NextResponse.json({ success: true });
   } catch (e) {
     return bizError(e);

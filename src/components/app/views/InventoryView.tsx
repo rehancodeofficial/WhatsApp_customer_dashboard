@@ -159,7 +159,9 @@ function StockTable({ products, suppliers, canManage, onEdit, onMove }: { produc
   const [brand, setBrand] = useState('all');
   const sup = new Map(suppliers.map((s) => [s.id, s.name]));
   const brands = useMemo(() => Array.from(new Set((products || []).map((p) => p.brand))).sort(), [products]);
-  const rows = (products || []).filter((p) => (brand === 'all' || p.brand === brand) && (!q || `${p.sku} ${p.brand} ${p.model} ${p.variant}`.toLowerCase().includes(q.toLowerCase())));
+  const rows = (products || [])
+    .filter((p) => (brand === 'all' || p.brand === brand) && (!q || `${p.sku} ${p.brand} ${p.model} ${p.variant}`.toLowerCase().includes(q.toLowerCase())))
+    .sort((a, b) => a.sku.localeCompare(b.sku, undefined, { numeric: true }));
   return (
     <Card>
       <div className="flex flex-col sm:flex-row gap-3 justify-between mb-4">
@@ -285,6 +287,7 @@ function ProductModal({ product, suppliers, onClose, onSaved }: { product: Produ
     setErr(null);
     try {
       const body: Record<string, unknown> = { ...f, supplier_id: f.supplier_id || null };
+      delete body.sku; // the ID is given by the server and never changes
       if (product) delete body.opening_stock;
       await api(product ? `/api/biz/products/${product.id}` : '/api/biz/products', { method: product ? 'PATCH' : 'POST', body: JSON.stringify(body) });
       onSaved();
@@ -311,7 +314,7 @@ function ProductModal({ product, suppliers, onClose, onSaved }: { product: Produ
         <Field label="Brand"><input className={inputCls} value={f.brand} onChange={set('brand')} placeholder="Apple" /></Field>
         <Field label="Model"><input className={inputCls} value={f.model} onChange={set('model')} placeholder="iPhone 15 Pro" /></Field>
         <Field label="Variant"><input className={inputCls} value={f.variant} onChange={set('variant')} placeholder="256GB Black" /></Field>
-        <Field label="SKU"><input className={inputCls} value={f.sku} onChange={set('sku')} /></Field>
+        <Field label="ID"><input className={cx(inputCls, 'bg-slate-50 text-slate-500 font-mono')} value={f.sku || 'Auto (next INV number)'} readOnly title="Given automatically in sequence: INV-0001, INV-0002, ..." /></Field>
         <Field label="Condition">
           <select className={inputCls} value={f.condition} onChange={set('condition')}>
             <option value="new">New</option>

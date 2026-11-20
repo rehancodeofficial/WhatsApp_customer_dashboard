@@ -19,7 +19,8 @@ export async function GET() {
         .filter((p) => p.active && p.stock_qty > 0)
         .map((p) => ({ id: p.id, brand: p.brand, model: p.model, variant: p.variant, condition: p.condition, sale_price: p.sale_price, currency: p.currency, stock_qty: p.stock_qty })),
       aiConfigured: !!process.env.CLAUDE_API_KEY,
-      defaultTemplate: process.env.WHATSAPP_BROADCAST_TEMPLATE || '',
+      // Approved in the Meta account (the n8n outreach uses it too); has no variables.
+      defaultTemplate: process.env.WHATSAPP_BROADCAST_TEMPLATE || 'phonebuzz_intro',
       defaultTemplateLanguage: process.env.WHATSAPP_BROADCAST_TEMPLATE_LANG || 'en',
     });
   } catch (e) {

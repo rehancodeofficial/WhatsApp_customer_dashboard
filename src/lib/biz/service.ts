@@ -36,6 +36,24 @@ export interface SendBroadcastInput {
  * Every sent message is also written into the customer's chat and the AI memory, so the AI
  * knows about the offer when the customer replies.
  */
+/**
+ * Sends an approved template. Templates with {{1}} / {{2}} get the first name and product line;
+ * if Meta says the template takes no (or other) variables, it is sent again without them
+ * (e.g. the account's "phonebuzz_intro" template has no variables).
+ */
+async function sendTemplate(to: string, name: string, lang: string, params: string[]) {
+  try {
+    return await sendMetaWhatsAppMessage({ to, type: 'template', templateName: name, templateLanguage: lang, templateParams: params });
+  } catch (e: any) {
+    const code = String(e?.code ?? e?.raw?.error?.code ?? '');
+    const msg = String(e?.message || '');
+    if (code === '132000' || code === '100' || /parameter/i.test(msg)) {
+      return await sendMetaWhatsAppMessage({ to, type: 'template', templateName: name, templateLanguage: lang });
+    }
+    throw e;
+  }
+}
+
 export async function sendBroadcast(input: SendBroadcastInput): Promise<Broadcast> {
   const store = getBizStore();
   const repo = getRepo();
@@ -81,13 +99,7 @@ export async function sendBroadcast(input: SendBroadcastInput): Promise<Broadcas
       let waId: string;
       if (live) {
         const res = useTemplate
-          ? await sendMetaWhatsAppMessage({
-              to: c.wa_id,
-              type: 'template',
-              templateName: input.template_name!,
-              templateLanguage: input.template_language || 'en',
-              templateParams: [(c.name || c.profile_name || 'there').split(' ')[0], productText],
-            })
+          ? await sendTemplate(c.wa_id, input.template_name!, input.template_language || 'en', [(c.name || c.profile_name || 'there').split(' ')[0], productText])
           : await sendMetaWhatsAppMessage({ to: c.wa_id, type: 'text', text: body });
         waId = res.waMessageId;
       } else {
@@ -96,11 +108,11 @@ export async function sendBroadcast(input: SendBroadcastInput): Promise<Broadcas
       const shown = useTemplate ? `[Template: ${input.template_name}] ${productText}` : body;
       await store.updateRecipient(r.id, { status: 'sent', wa_message_id: waId, sent_at: new Date().toISOString() });
       sent++;
-      // Show it in the chat and give the AI the context. Never fail the broadcast for this.
-      if (c.conversation_id) {
+      // Show it in the customer's chat (created if needed) and give the AI the context. Never fail the broadcast for this.
+      {
         await repo
-          .logOutbound({ wa_id: c.wa_id, wa_message_id: waId, type: useTemplate ? 'template' : 'text', body: shown, sender_type: 'agent', sender_user_id: input.created_by, raw: { broadcast_id: broadcast.id } })
-          .catch(() => {});
+          .logOutbound({ wa_id: c.wa_id, party: 'customer', name: c.name || c.profile_name || null, wa_message_id: waId, type: useTemplate ? 'template' : 'text', body: shown, sender_type: 'agent', sender_user_id: input.created_by, raw: { broadcast_id: broadcast.id } })
+          .catch((e) => console.error('broadcast chat log failed', c.wa_id, e?.message || e));
         await repo.appendMemory(c.wa_id, 'ai', `[Broadcast offer sent by Phone Buzz]: ${shown}`).catch(() => {});
       }
     } catch (e: any) {

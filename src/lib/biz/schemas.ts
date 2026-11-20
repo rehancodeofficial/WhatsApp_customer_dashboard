@@ -37,7 +37,8 @@ export const SupplierBody = z.object({
 export const SupplierPatch = SupplierBody.partial();
 
 export const ProductBody = z.object({
-  sku: str(60).min(1, 'Enter a SKU'),
+  /** Left empty on create: the next INV-0001-style ID is given automatically. */
+  sku: optStr(60),
   brand: str(60).min(1, 'Enter a brand'),
   model: str(120).min(1, 'Enter a model'),
   variant: optStr(120),
@@ -53,7 +54,8 @@ export const ProductBody = z.object({
   /** Only on create: opening stock, recorded as a stock-in movement. */
   opening_stock: z.coerce.number().int().min(0).max(10_000_000).optional(),
 });
-export const ProductPatch = ProductBody.omit({ opening_stock: true }).partial();
+// The inventory ID (sku) never changes once given: n8n and orders refer to it.
+export const ProductPatch = ProductBody.omit({ opening_stock: true, sku: true }).partial();
 
 export const MovementBody = z.object({
   product_id: z.string().uuid(),

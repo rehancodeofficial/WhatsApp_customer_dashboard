@@ -6,6 +6,8 @@ import { loadCustomerViews } from '@/lib/biz/service';
 import { bizError } from '@/lib/biz/http';
 import { CustomerBody, ENTITY_PERMS, MovementBody, OrderBody, ProductBody, SupplierBody, zodMessage } from '@/lib/biz/schemas';
 import { watchInventory } from '@/lib/biz/inventory-sync';
+import { byCode, nextInventoryId, nextSupplierCode } from '@/lib/biz/ids';
+import { pushSupplier } from '@/lib/biz/supplier-sync';
 
 type Ctx = { params: Promise<{ entity: string }> };
 
@@ -22,11 +24,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         return NextResponse.json({ customers: await loadCustomerViews() });
       case 'products': {
         const [products, suppliers] = await Promise.all([store.listProducts(), can(v, 'suppliers.view') || can(v, 'inventory.view') ? store.listSuppliers() : []]);
-        return NextResponse.json({ products, suppliers: suppliers.map((s) => ({ id: s.id, name: s.name })) });
+        return NextResponse.json({ products: products.sort((x, y) => byCode(x.sku, y.sku)), suppliers: suppliers.sort((x, y) => byCode(x.code, y.code)).map((s) => ({ id: s.id, name: s.code ? `${s.code} · ${s.name}` : s.name })) });
       }
       case 'inventory': {
         const [movements, products] = await Promise.all([store.listMovements(), store.listProducts()]);
-        return NextResponse.json({ movements, products });
+        return NextResponse.json({ movements, products: products.sort((x, y) => byCode(x.sku, y.sku)) });
       }
       case 'suppliers': {
         const [suppliers, products] = await Promise.all([store.listSuppliers(), store.listProducts()]);
@@ -38,7 +40,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
           c.units += p.stock_qty;
           counts.set(p.supplier_id, c);
         }
-        return NextResponse.json({ suppliers: suppliers.map((s) => ({ ...s, ...(counts.get(s.id) || { skus: 0, units: 0 }) })) });
+        return NextResponse.json({ suppliers: suppliers.sort((x, y) => byCode(x.code, y.code)).map((s) => ({ ...s, ...(counts.get(s.id) || { skus: 0, units: 0 }) })) });
       }
       case 'orders': {
         const [orders, customers, products] = await Promise.all([store.listOrders(), store.listCustomers(), store.listProducts()]);
@@ -74,12 +76,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       case 'suppliers': {
         const p = SupplierBody.safeParse(body);
         if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
-        return NextResponse.json({ supplier: await store.saveSupplier(null, p.data as any) });
+        const code = await nextSupplierCode((await store.listSuppliers()).map((x) => x.code));
+        const supplier = await store.saveSupplier(null, { ...(p.data as any), code });
+        await pushSupplier(supplier);
+        return NextResponse.json({ supplier });
       }
       case 'products': {
         const p = ProductBody.safeParse(body);
         if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
         const { opening_stock, ...data } = p.data;
+        if (!data.sku) data.sku = await nextInventoryId((await store.listProducts()).map((x) => x.sku));
         const product = await watchInventory('dashboard', async () => {
           const created = await store.saveProduct(null, data as any);
           if (opening_stock) {
