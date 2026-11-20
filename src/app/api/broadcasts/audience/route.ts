@@ -5,6 +5,7 @@ import { filterAudience } from '@/lib/biz/logic';
 import { bizError } from '@/lib/biz/http';
 import { AudienceBody, zodMessage } from '@/lib/biz/schemas';
 import { get24HourWindowStatus } from '@/lib/whatsapp';
+import { channelOf } from '@/lib/biz/channel';
 
 // Preview who a broadcast would reach, plus the filter options (countries, brands) that exist.
 export async function POST(req: NextRequest) {
@@ -27,7 +28,10 @@ export async function POST(req: NextRequest) {
         tier: c.tier,
         brands: c.brands,
         total_spent: c.total_spent,
-        windowOpen: get24HourWindowStatus(c.last_customer_message_at).isOpen,
+        channel: channelOf(c),
+        email: c.email ?? null,
+        // Email customers have no 24 h rule.
+        windowOpen: channelOf(c) === 'email' ? true : get24HourWindowStatus(c.last_customer_message_at).isOpen,
       })),
     });
   } catch (e) {

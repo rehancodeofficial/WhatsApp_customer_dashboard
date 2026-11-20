@@ -4,6 +4,7 @@
 import { getBizStore } from './store';
 import type { CustomerRecord, Order, OrderStatus, OrderPaymentStatus, Product } from './types';
 import { DEFAULT_CURRENCY } from '@/lib/currency';
+import { emailKey, isEmailOnly } from './channel';
 
 export const SYNC_SHEETS = [
   'Customer_Leads',
@@ -74,9 +75,12 @@ async function findCustomer(r: Row): Promise<CustomerRecord | null> {
   const list = await store.listCustomers();
   const wa = digits(r.WhatsApp_Number);
   const lead = txt(r.Lead_ID) || txt(r.Customer_ID);
+  const email = (txt(r.Email) || '').toLowerCase();
   return (
     (wa && list.find((c) => c.wa_id === wa)) ||
     (lead && list.find((c) => c.lead_id === lead || c.customer_code === lead)) ||
+    // Email-only customers (no WhatsApp number): matched by their email.
+    (email && list.find((c) => c.wa_id === emailKey(email) || (isEmailOnly(c.wa_id) && (c.email || '').toLowerCase() === email))) ||
     null
   );
 }
@@ -103,8 +107,10 @@ async function syncCustomerLead(r: Row) {
   if (existing) customer = await store.updateCustomer(existing.id, fields as Partial<CustomerRecord>);
   else {
     const wa = digits(r.WhatsApp_Number);
-    if (!wa) throw Object.assign(new Error('New lead needs WhatsApp_Number'), { status: 400 });
-    customer = await store.createCustomer({ wa_id: wa, ...(fields as Partial<CustomerRecord>) });
+    const email = txt(r.Email);
+    if (!wa && !email) throw Object.assign(new Error('New lead needs WhatsApp_Number or Email'), { status: 400 });
+    // A lead that came by email (no WhatsApp number) is saved as an email customer.
+    customer = await store.createCustomer({ wa_id: wa || emailKey(email!), ...(fields as Partial<CustomerRecord>) });
   }
   // Keep a history of what the customer asked for (only when the inquiry changed).
   if (brand || has(r, 'Model')) {
@@ -143,11 +149,12 @@ async function syncCustomer(r: Row) {
   } as Row) as Partial<CustomerRecord>;
   if (existing) return { customer_id: (await store.updateCustomer(existing.id, fields)).id };
   const wa = digits(r.WhatsApp_Number);
-  if (!wa) {
+  const email = txt(r.Email);
+  if (!wa && !email) {
     // "Save Customer Language" only sends Customer_ID + language: ignore unknown customers.
     return { skipped: 'customer not found' };
   }
-  return { customer_id: (await store.createCustomer({ wa_id: wa, ...fields })).id };
+  return { customer_id: (await store.createCustomer({ wa_id: wa || emailKey(email!), ...fields })).id };
 }
 
 async function syncInventory(r: Row) {

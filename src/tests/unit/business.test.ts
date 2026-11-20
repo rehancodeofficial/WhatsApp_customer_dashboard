@@ -150,3 +150,21 @@ describe('password vault', () => {
     expect(() => decryptSecret(a.slice(0, -2) + 'xx')).toThrow();
   });
 });
+
+import { channelOf, contactLabel, emailKey, isEmailOnly } from '@/lib/biz/channel';
+import { broadcastEmailHtml } from '@/lib/biz/service';
+describe('email-only customers', () => {
+  it('get a placeholder id, the email channel and a readable label', () => {
+    const wa = emailKey('  Ali@Shop.COM ');
+    expect(wa).toBe('email:ali@shop.com');
+    expect(isEmailOnly(wa)).toBe(true);
+    expect(channelOf({ wa_id: wa })).toBe('email');
+    expect(channelOf({ wa_id: '923001234567' })).toBe('whatsapp');
+    expect(contactLabel({ wa_id: wa, email: 'Ali@Shop.com' })).toBe('Ali@Shop.com');
+    expect(contactLabel({ wa_id: '923001234567' })).toBe('+923001234567');
+  });
+  it('broadcast email keeps line breaks and escapes HTML', () => {
+    const h = broadcastEmailHtml('Hi Ali,\n<b>iPhone</b> & more');
+    expect(h).toContain('Hi Ali,<br>&lt;b&gt;iPhone&lt;/b&gt; &amp; more');
+  });
+});

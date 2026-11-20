@@ -6,6 +6,7 @@ import type { Order, OrderStatus } from '@/lib/biz/types';
 import { ExportButton } from '../ExportButton';
 import { BarList, ColumnChart } from '../charts';
 import { api, Button, Card, Chip, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, PageHeader, PillTabs, SearchInput, StatusDot, Table, td } from '../ui';
+import { contactLabel } from '@/lib/biz/channel';
 
 export const ORDER_STATUS: Record<OrderStatus, { label: string; color: 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'orange' }> = {
   pending: { label: 'Pending', color: 'amber' },
@@ -108,7 +109,7 @@ export function OrdersView({ perms }: { perms: Set<string> }) {
                 <tr key={o.id} className="hover:bg-slate-50/60 cursor-pointer" onClick={() => setOpen(o)}>
                   <td className={cx(td, 'font-medium text-slate-800 whitespace-nowrap')}>{o.order_no}</td>
                   <td className={td}>
-                    <div className="text-slate-800">{o.customer?.name || (o.customer ? `+${o.customer.wa_id}` : 'Walk-in')}</div>
+                    <div className="text-slate-800">{o.customer?.name || (o.customer ? contactLabel(o.customer) : 'Walk-in')}</div>
                     {o.customer?.country && <div className="text-[11px] text-slate-400">{o.customer.country}</div>}
                   </td>
                   <td className={cx(td, 'text-slate-600 max-w-64 truncate')}>{(o.items || []).map((i) => `${i.quantity}× ${i.description}`).join(', ')}</td>
@@ -133,7 +134,7 @@ export function OrdersView({ perms }: { perms: Set<string> }) {
         {open && (
           <div className="space-y-4">
             <div className="text-sm text-slate-600">
-              {open.customer?.name || 'Walk-in'} {open.customer && <span className="text-slate-400">· +{open.customer.wa_id}</span>}
+              {open.customer?.name || 'Walk-in'} {open.customer && <span className="text-slate-400">· {contactLabel(open.customer)}</span>}
               <div className="text-xs text-slate-400">{dateTime(open.created_at)} · source: {open.source.replace('_', ' ')}</div>
             </div>
             <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100">
@@ -238,7 +239,7 @@ function NewOrderModal({ customers, products, canPay, onClose, onDone }: { custo
           <select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)}>
             <option value="">Walk-in / no customer</option>
             {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name || `+${c.wa_id}`}{c.country ? ` · ${c.country}` : ''}</option>
+              <option key={c.id} value={c.id}>{c.name || contactLabel(c)}{c.country ? ` · ${c.country}` : ''}</option>
             ))}
           </select>
         </Field>

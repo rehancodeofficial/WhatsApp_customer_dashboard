@@ -1,13 +1,14 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock, Megaphone, Send, Sparkles, Users } from 'lucide-react';
+import { CheckCircle2, Clock, Mail, Megaphone, Send, Sparkles, Users } from 'lucide-react';
 import type { Broadcast, BroadcastRecipient, PaymentTier } from '@/lib/biz/types';
 import type { ProductSuggestion } from '@/lib/biz/logic';
 import { ExportButton } from '../ExportButton';
 import { api, Avatar, Button, Card, CardHeader, Chip, MultiSelect, SearchInput, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, num, PageHeader, PillTabs, StatusDot, Table, td, TierBadge } from '../ui';
+import { contactLabel } from '@/lib/biz/channel';
 
 interface BProduct { id: string; brand: string; model: string; variant: string | null; condition: string; sale_price: number; currency: string; stock_qty: number }
-interface Aud { id: string; name: string | null; wa_id: string; country: string | null; tier: PaymentTier; brands: string[]; total_spent: number; windowOpen: boolean }
+interface Aud { id: string; name: string | null; wa_id: string; email?: string | null; channel?: 'whatsapp' | 'email'; country: string | null; tier: PaymentTier; brands: string[]; total_spent: number; windowOpen: boolean }
 type Suggestion = ProductSuggestion & { aiNote?: string };
 
 const pname = (p: BProduct) => `${p.brand} ${p.model}${p.variant ? ' ' + p.variant : ''}`;
@@ -108,7 +109,8 @@ export function BroadcastView() {
   };
 
   const recipients = (audience || []).filter((a) => !excluded.has(a.id));
-  const closedWindow = recipients.filter((r) => !r.windowOpen).length;
+  const closedWindow = recipients.filter((r) => r.channel !== 'email' && !r.windowOpen).length;
+  const byEmail = recipients.filter((r) => r.channel === 'email').length;
 
   const send = async () => {
     setSending(true);
@@ -310,15 +312,15 @@ export function BroadcastView() {
                           }}
                           className="accent-slate-800 w-4 h-4"
                         />
-                        <Avatar name={a.name || a.wa_id} size={34} />
+                        <Avatar name={a.name || a.email || a.wa_id} size={34} />
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm text-slate-800 truncate">{a.name || `+${a.wa_id}`}</div>
+                          <div className="text-sm text-slate-800 truncate">{a.name || (a.channel === 'email' ? a.email : `+${a.wa_id}`)}</div>
                           <div className="text-[11px] text-slate-500 truncate">{a.country || '—'} · {a.brands.join(', ') || 'no brands'}</div>
                         </div>
                         <div className="text-right shrink-0">
                           <TierBadge tier={a.tier} />
                           <div className="text-[10px] text-slate-400 mt-0.5 inline-flex items-center gap-1">
-                            {a.windowOpen ? <><CheckCircle2 className="w-3 h-3 text-emerald-500" /> free text</> : <><Clock className="w-3 h-3" /> template</>}
+                            {a.channel === 'email' ? <><Mail className="w-3 h-3 text-sky-600" /> email</> : a.windowOpen ? <><CheckCircle2 className="w-3 h-3 text-emerald-500" /> WhatsApp</> : <><Clock className="w-3 h-3" /> WhatsApp template</>}
                           </div>
                         </div>
                       </label>
@@ -332,6 +334,11 @@ export function BroadcastView() {
                 <span className="text-slate-500">Will send to</span>
                 <b className="text-slate-800">{recipients.length} customers</b>
               </div>
+              {byEmail > 0 && (
+                <p className="text-xs mt-2 text-slate-500 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-sky-600" /> {byEmail} of them came by email and get it by email (subject = title).
+                </p>
+              )}
               {closedWindow > 0 && (
                 <p className={cx('text-xs mt-2', template ? 'text-slate-500' : 'text-amber-700')}>
                   {closedWindow} of them last wrote more than 24 h ago{template ? ` and get the "${template}" template.` : '. Add an approved template, or they will be skipped.'}
@@ -411,7 +418,7 @@ function History({ list }: { list: Broadcast[] | null }) {
                 {rec.map((r) => (
                   <tr key={r.id}>
                     <td className={td}>{r.name || '—'}</td>
-                    <td className={cx(td, 'text-slate-500')}>+{r.wa_id}</td>
+                    <td className={cx(td, 'text-slate-500')}>{contactLabel(r)}</td>
                     <td className={td}><StatusDot color={r.status === 'failed' ? 'red' : r.status === 'queued' ? 'gray' : 'green'} label={r.status} /></td>
                     <td className={cx(td, 'text-xs text-slate-500')}>{r.error || ''}</td>
                   </tr>

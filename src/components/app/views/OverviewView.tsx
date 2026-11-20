@@ -6,6 +6,7 @@ import type { InventoryAnalytics, SalesAnalytics } from '@/lib/biz/logic';
 import { api, Card, CardHeader, cx, ErrorNote, Loading, money, num, PillTabs, shortDate, StatusDot, Table, td } from '../ui';
 import { LineGraph } from '../LineGraph';
 import { ORDER_STATUS } from './OrdersView';
+import { contactLabel } from '@/lib/biz/channel';
 
 const RANGES = [
   { id: '7', label: '7D' },
@@ -301,7 +302,7 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                   return (
                     <tr key={o.id} className="hover:bg-slate-50/60">
                       <td className={cx(td, 'font-medium text-slate-800')}>{o.order_no}</td>
-                      <td className={td}>{o.customer?.name || (o.customer ? `+${o.customer.wa_id}` : '—')}</td>
+                      <td className={td}>{o.customer?.name || (o.customer ? contactLabel(o.customer) : '—')}</td>
                       <td className={cx(td, 'text-slate-600 max-w-56 truncate')}>{(o.items || []).map((i: any) => `${i.quantity}× ${i.description}`).join(', ')}</td>
                       <td className={cx(td, 'tabular-nums font-medium')}>{money(o.total)}</td>
                       <td className={td}>

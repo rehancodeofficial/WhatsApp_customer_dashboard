@@ -6,6 +6,7 @@ import { ExportButton } from '../ExportButton';
 import { BarList } from '../charts';
 import { api, Avatar, Button, Card, Chip, ChipSelect, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, PillTabs, SearchInput, shortDate, StatusDot, TierBadge, TIER_LABEL } from '../ui';
 import { ORDER_STATUS } from './OrdersView';
+import { contactLabel, isEmailOnly } from '@/lib/biz/channel';
 
 type Tab = 'details' | 'orders';
 
@@ -44,7 +45,7 @@ export function CustomersView({
     if (country !== 'all' && c.country !== country) return false;
     const t = q.trim().toLowerCase();
     if (!t) return true;
-    return [c.name, c.wa_id, c.company, c.country, ...c.brands].some((v) => v && v.toLowerCase().includes(t));
+    return [c.name, c.wa_id, c.email, c.company, c.country, ...c.brands].some((v) => v && v.toLowerCase().includes(t));
   });
   const current = list?.find((c) => c.id === sel) || null;
 
@@ -126,7 +127,7 @@ export function CustomersView({
                   <Avatar name={c.name || c.wa_id} size={42} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-sm font-semibold text-slate-800 truncate">{c.name || `+${c.wa_id}`}</span>
+                      <span className="text-sm font-semibold text-slate-800 truncate">{c.name || contactLabel(c)}</span>
                       <span className="text-[10px] text-slate-400 shrink-0">{c.last_order_at ? shortDate(c.last_order_at) : ''}</span>
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
@@ -224,11 +225,11 @@ function CustomerDetail({
           <Avatar name={c.name || c.wa_id} size={50} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-800 truncate">{c.name || `+${c.wa_id}`}</h2>
+              <h2 className="text-lg font-bold text-slate-800 truncate">{c.name || contactLabel(c)}</h2>
               <TierBadge tier={c.tier} auto={c.tier_auto} />
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              +{c.wa_id} {c.country && `· ${c.country}`} {c.company && `· ${c.company}`}
+              {contactLabel(c)} {isEmailOnly(c.wa_id) && '(email customer)'} {c.country && `· ${c.country}`} {c.company && `· ${c.company}`}
             </p>
             <div className="flex flex-wrap gap-1 mt-2">
               {c.brands.map((b) => (
@@ -242,6 +243,7 @@ function CustomerDetail({
                 <MessageSquare className="w-3.5 h-3.5" /> Chats
               </Button>
             )}
+            {!isEmailOnly(c.wa_id) && (
             <a
               href={`https://wa.me/${c.wa_id}`}
               target="_blank"
@@ -250,6 +252,7 @@ function CustomerDetail({
             >
               WhatsApp
             </a>
+            )}
           </div>
         </div>
 
@@ -310,7 +313,7 @@ function CustomerDetail({
                 )}
               </div>
               <Row k="Full name" v={c.name} />
-              <Row k="WhatsApp number" v={`+${c.wa_id}`} />
+              <Row k={isEmailOnly(c.wa_id) ? 'Contact' : 'WhatsApp number'} v={isEmailOnly(c.wa_id) ? `${contactLabel(c)} (came by email)` : `+${c.wa_id}`} />
               <Row k="Email address" v={c.email} />
               <Row k="Company" v={c.company} />
               <Row k="Country / City" v={[c.country, c.city].filter(Boolean).join(', ')} />

@@ -5,6 +5,8 @@ import { get24HourWindowStatus, sendMetaWhatsAppMessage } from '@/lib/whatsapp';
 import { getBizStore } from './store';
 import { buildCustomerViews, filterAudience, personalize, productLine } from './logic';
 import type { AudienceFilters, Broadcast, CustomerView } from './types';
+import { channelOf } from './channel';
+import { callN8nBridge } from '@/lib/n8n-bridge';
 
 export async function loadCustomerViews(): Promise<CustomerView[]> {
   const store = getBizStore();
@@ -56,6 +58,16 @@ async function sendTemplate(to: string, name: string, lang: string, params: stri
     }
     throw e;
   }
+}
+
+/** The broadcast as a simple branded email (same text as the WhatsApp message). */
+export function broadcastEmailHtml(text: string) {
+  const esc = text.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+  return `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#1E293B;font-size:15px;line-height:1.6">
+  <div style="font-weight:bold;color:#F97316;font-size:18px;margin-bottom:14px">Phone Buzz FZCO</div>
+  <div>${esc.replace(/\r?\n/g, '<br>')}</div>
+  <p style="color:#64748B;font-size:12px;margin-top:24px;border-top:1px solid #E2E8F0;padding-top:12px">Phone Buzz FZCO, Dubai · Reply to this email to order or ask a question.</p>
+</div>`;
 }
 
 /** Approved in the Meta account, no variables (generic intro). */
@@ -111,6 +123,24 @@ export async function sendBroadcast(input: SendBroadcastInput): Promise<Broadcas
   for (const r of recipients) {
     const c = targets.find((t) => t.id === r.contact_id)!;
     const body = personalize(input.message, c.name || c.profile_name);
+    // Customers who came by email get the broadcast by email (no 24 h rule, no template).
+    if (channelOf(c) === 'email') {
+      try {
+        if (!c.email) throw new Error('No email address for this customer');
+        let ref = `email.demo_broadcast_${broadcast.id.slice(0, 8)}_${sent + failed}`;
+        if (live) {
+          const res = await callN8nBridge('send_email', { to: c.email, subject: input.title, html: broadcastEmailHtml(body) });
+          if (res && res.ok === false) throw new Error('Email not sent: ' + (res.error || 'unknown error'));
+          ref = `email:${Date.now()}`;
+        }
+        await store.updateRecipient(r.id, { status: 'sent', wa_message_id: ref, sent_at: new Date().toISOString() });
+        sent++;
+      } catch (e: any) {
+        failed++;
+        await store.updateRecipient(r.id, { status: 'failed', error: String(e?.message || e).slice(0, 300) });
+      }
+      continue;
+    }
     const windowOpen = get24HourWindowStatus(c.last_customer_message_at).isOpen;
     const useTemplate = !windowOpen;
     try {
