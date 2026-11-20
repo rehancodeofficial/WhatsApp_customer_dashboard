@@ -23,6 +23,7 @@ const SYSTEM_PROMPT =
   'The owner wants to send a WhatsApp broadcast to past customers to move stock. ' +
   'From the candidate products (facts below, from the live inventory), pick the best 1-3 to broadcast now, best first. ' +
   'Only use product_ids from the list. Never invent prices, stock or discounts: a discount may be at most max_discount_pct. ' +
+  'Do NOT include condition like (refurbished) or (used) in the product name. ' +
   'Write each message for wholesale buyers: short, clear price per piece, units available, a call to reply with quantity. ' +
   'Start the message with "Hi {name}," ({name} is replaced per customer). Plain text, at most 3 emojis. ' +
   'Respond with ONLY valid JSON in this exact shape: {"picks":[{"product_id":"...","why":"one sentence for the owner","message":"the WhatsApp text under 600 chars"}]}';

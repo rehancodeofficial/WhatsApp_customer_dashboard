@@ -18,7 +18,7 @@ export async function GET() {
       broadcasts,
       products: products
         .filter((p) => p.active && p.stock_qty > 0)
-        .map((p) => ({ id: p.id, brand: p.brand, model: p.model, variant: p.variant, condition: p.condition, sale_price: p.sale_price, currency: p.currency, stock_qty: p.stock_qty })),
+        .map((p) => ({ id: p.id, brand: p.brand, model: p.model, variant: p.variant, condition: p.condition, grade: p.grade, location: p.location, sale_price: p.sale_price, currency: p.currency, stock_qty: p.stock_qty })),
       aiConfigured: !!process.env.GEMINI_API_KEY,
       // "phonebuzz_offer" carries the dashboard text ({{1}} first name, {{2}} offer). Until Meta approves it,
       // sending falls back to the approved "phonebuzz_intro" (no variables).

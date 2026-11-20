@@ -7,11 +7,11 @@ import { ExportButton } from '../ExportButton';
 import { api, Avatar, Button, Card, CardHeader, Chip, MultiSelect, SearchInput, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, money, num, PageHeader, PillTabs, StatusDot, Table, td, TierBadge } from '../ui';
 import { contactLabel } from '@/lib/biz/channel';
 
-interface BProduct { id: string; brand: string; model: string; variant: string | null; condition: string; sale_price: number; currency: string; stock_qty: number }
+interface BProduct { id: string; brand: string; model: string; variant: string | null; condition: string; grade?: string | null; location?: string | null; sale_price: number; currency: string; stock_qty: number }
 interface Aud { id: string; name: string | null; wa_id: string; email?: string | null; channel?: 'whatsapp' | 'email'; country: string | null; tier: PaymentTier; brands: string[]; total_spent: number; windowOpen: boolean }
 type Suggestion = ProductSuggestion & { aiNote?: string };
 
-const pname = (p: BProduct) => `${p.brand} ${p.model}${p.variant ? ' ' + p.variant : ''}`;
+const pname = (p: BProduct) => `${p.brand} ${p.model}${p.variant ? ' ' + p.variant : ''}`.trim();
 
 export function BroadcastView() {
   const [tab, setTab] = useState<'new' | 'history'>('new');
@@ -31,6 +31,8 @@ export function BroadcastView() {
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
+  const [offerPrice, setOfferPrice] = useState('');
+  const [offerStock, setOfferStock] = useState('');
   const [template, setTemplate] = useState('');
   const [aiUsed, setAiUsed] = useState(false);
   const [sending, setSending] = useState(false);
@@ -93,19 +95,59 @@ export function BroadcastView() {
     document.getElementById('composer')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Default message when products are picked by hand.
+  // Default message when products are picked by hand or prices/stock/country change.
+  const buildMessage = (picked: BProduct[], priceStr: string, stockStr: string, selectedCountries: string[]) => {
+    if (!picked.length) return '';
+    const loc = selectedCountries.length === 1 ? selectedCountries[0] : (picked[0].location || 'Dubai');
+    return (
+      `🔥 Special wholesale offer from Phone Buzz!\n\n` +
+      picked
+        .map((p, idx) => {
+          const itemPrice = idx === 0 && priceStr ? priceStr : p.sale_price.toLocaleString();
+          const itemStock = idx === 0 && stockStr ? stockStr : String(p.stock_qty);
+          return `${pname(p)}\n${p.currency} ${itemPrice} per piece\n✅ ${itemStock} units ready in ${loc}`;
+        })
+        .join('\n\n') +
+      `\n\nReply with the quantity to book your order.`
+    );
+  };
+
   const pickProducts = (ids: string[]) => {
     setProductIds(ids);
     const picked = products.filter((p) => ids.includes(p.id));
     if (!aiUsed && picked.length) {
-      setTitle(picked.length === 1 ? `${pname(picked[0])} offer` : 'New stock offer');
-      setMessage(
-        `Hi {name},\n\nNew wholesale offer from Phone Buzz:\n` +
-          picked.map((p) => `• ${pname(p)} (${p.condition}): ${p.currency} ${p.sale_price.toLocaleString()} per piece, ${p.stock_qty} units ready`).join('\n') +
-          `\n\nReply with the model and quantity to book.`
-      );
+      const p0 = picked[0];
+      const pStr = String(p0.sale_price);
+      const sStr = String(p0.stock_qty);
+      setTitle(picked.length === 1 ? `${pname(p0)} offer` : 'New stock offer');
+      setOfferPrice(picked.length === 1 ? pStr : '');
+      setOfferStock(picked.length === 1 ? sStr : '');
+      setMessage(buildMessage(picked, pStr, sStr, countries));
     }
-    // Picking a product does not filter the customers: everyone stays selected unless you set a filter below.
+  };
+
+  const updatePrice = (val: string) => {
+    setOfferPrice(val);
+    const picked = products.filter((p) => productIds.includes(p.id));
+    if (picked.length) {
+      setMessage(buildMessage(picked, val, offerStock, countries));
+    }
+  };
+
+  const updateStock = (val: string) => {
+    setOfferStock(val);
+    const picked = products.filter((p) => productIds.includes(p.id));
+    if (picked.length) {
+      setMessage(buildMessage(picked, offerPrice, val, countries));
+    }
+  };
+
+  const updateCountries = (val: string[]) => {
+    setCountries(val);
+    const picked = products.filter((p) => productIds.includes(p.id));
+    if (picked.length && !aiUsed) {
+      setMessage(buildMessage(picked, offerPrice, offerStock, val));
+    }
   };
 
   const recipients = (audience || []).filter((a) => !excluded.has(a.id));
@@ -231,7 +273,7 @@ export function BroadcastView() {
             <CardHeader title="2. Customers" subtitle="Every filter is optional. Leave one empty to include everyone." />
             <div className="grid sm:grid-cols-3 gap-3">
               <Field label="Country">
-                <MultiSelect options={options.countries} value={countries} onChange={setCountries} placeholder="All countries" searchPlaceholder="Search country" />
+                <MultiSelect options={options.countries} value={countries} onChange={updateCountries} placeholder="All countries" searchPlaceholder="Search country" />
               </Field>
               <Field label="Payment tier">
                 <MultiSelect options={['high', 'medium', 'low']} value={tiers} onChange={setTiers} placeholder="All tiers" render={(o) => (o === 'high' ? 'High paying' : o === 'medium' ? 'Medium' : 'Low paying')} />
@@ -244,6 +286,26 @@ export function BroadcastView() {
             <div className="border-t border-slate-100 my-5" />
             <CardHeader title="3. Message" subtitle="{name} becomes the customer's first name." />
             <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Offer price per piece">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={offerPrice}
+                    onChange={(e) => updatePrice(e.target.value)}
+                    placeholder="e.g. 750"
+                  />
+                </Field>
+                <Field label="Offer stock (units)">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={offerStock}
+                    onChange={(e) => updateStock(e.target.value)}
+                    placeholder="e.g. 50"
+                  />
+                </Field>
+              </div>
               <Field label="Title (for your records)"><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="iPhone 13 clearance" /></Field>
               <Field label="Message">
                 <textarea rows={8} className={inputCls} value={message} onChange={(e) => { setMessage(e.target.value); }} maxLength={1000} />

@@ -354,6 +354,7 @@ export function suggestProducts(products: Product[], movements: InventoryMovemen
     const discountPct = margin >= 0.1 ? 5 : margin >= 0.06 ? 3 : 0;
     const price = Math.round(p.sale_price * (1 - discountPct / 100));
     const name = `${p.brand} ${p.model}${p.variant ? ' ' + p.variant : ''}`;
+    const locationStr = p.location ? `ready in ${p.location}` : 'ready in Dubai';
     out.push({
       product_id: p.id,
       product: name,
@@ -367,9 +368,9 @@ export function suggestProducts(products: Product[], movements: InventoryMovemen
       audience: highTier >= 3 ? { brands: [p.brand], tiers: ['high', 'medium'] } : audience,
       audienceSize: highTier >= 3 ? highTier : audienceSize,
       message:
-        `Hi {name},\n\n🔥 Special wholesale offer from Phone Buzz!\n\n${name} (${p.condition})\n` +
+        `Hi {name},\n\n🔥 Special wholesale offer from Phone Buzz!\n\n${name}\n` +
         (discountPct ? `Now ${p.currency} ${price.toLocaleString()} per piece (was ${p.sale_price.toLocaleString()})` : `${p.currency} ${p.sale_price.toLocaleString()} per piece`) +
-        `\n✅ ${p.stock_qty} units ready in Dubai\n\nReply with the quantity to book your order.`,
+        `\n✅ ${p.stock_qty} units ${locationStr}\n\nReply with the quantity to book your order.`,
     });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
