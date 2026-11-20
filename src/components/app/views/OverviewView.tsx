@@ -198,7 +198,7 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
           </div>
 
           {/* 4. Stock value Card */}
-          <div className="xl:col-span-3 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
+          <div className="xl:col-span-2 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm text-slate-600 font-medium">Stock value</span>
@@ -208,9 +208,9 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
               </div>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-                  {inv ? money(inv.stockValueCost, undefined, true) : '—'}
+                  {inv ? money(inv.onHandValue, undefined, true) : '—'}
                 </span>
-                <span className="text-[11px] text-slate-400 font-medium">{inv ? `${num(inv.units)} units` : ''}</span>
+                <span className="text-[11px] text-slate-400 font-medium">{inv ? `${num(inv.onHandUnits)} on hand` : ''}</span>
               </div>
               {/* Owner critical metrics under stock value: Low stock & Out of stock alerts */}
               <div className="space-y-1 mt-3 pt-2.5 border-t border-slate-100 text-xs">
@@ -235,6 +235,28 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
             <div className="text-[10px] text-slate-400 mt-2">
               live inventory
             </div>
+          </div>
+
+          {/* 5. Reserved Stock Card */}
+          <div className="xl:col-span-1 bg-white rounded-3xl border border-slate-200/70 p-5 flex flex-col justify-between min-h-[170px]">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs sm:text-sm text-slate-600 font-medium">Reserved stock</span>
+                <span className="w-7 h-7 rounded-full bg-amber-50 border border-amber-200/80 flex items-center justify-center">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                  {inv ? money(inv.reservedValue, undefined, true) : '—'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">{inv ? `${num(inv.reservedUnits)} units` : ''}</span>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
+                Paid orders awaiting fulfillment
+              </div>
+            </div>
+            <div className="text-[10px] text-slate-400 mt-2">reserved inventory</div>
           </div>
 
           {/* 2 Line Graphs Side by Side: Sales by Country & Sales by Brand */}

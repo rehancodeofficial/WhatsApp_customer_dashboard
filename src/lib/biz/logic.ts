@@ -216,6 +216,14 @@ export interface InventoryAnalytics {
   units: number;
   stockValueCost: number;
   stockValueSale: number;
+  /** Available on-hand units = stock_qty - reserved_qty */
+  onHandUnits: number;
+  /** Value of on-hand units at cost price */
+  onHandValue: number;
+  /** Reserved units (paid orders awaiting fulfillment) */
+  reservedUnits: number;
+  /** Value of reserved units at cost price */
+  reservedValue: number;
   lowStock: { product_id: string; name: string; brand: string; stock: number; reorder: number }[];
   outOfStock: number;
   /** Per product: sold units in the range, days of stock left at that pace. */
@@ -257,6 +265,10 @@ export function inventoryAnalytics(products: Product[], movements: InventoryMove
     units: active.reduce((a, p) => a + p.stock_qty, 0),
     stockValueCost: active.reduce((a, p) => a + p.stock_qty * p.cost_price, 0),
     stockValueSale: active.reduce((a, p) => a + p.stock_qty * p.sale_price, 0),
+    onHandUnits: active.reduce((a, p) => a + Math.max(0, p.stock_qty - (p.reserved_qty || 0)), 0),
+    onHandValue: active.reduce((a, p) => a + Math.max(0, p.stock_qty - (p.reserved_qty || 0)) * p.cost_price, 0),
+    reservedUnits: active.reduce((a, p) => a + (p.reserved_qty || 0), 0),
+    reservedValue: active.reduce((a, p) => a + (p.reserved_qty || 0) * p.cost_price, 0),
     lowStock: active
       .filter((p) => p.stock_qty <= p.reorder_level)
       .map((p) => ({ product_id: p.id, name: name(p), brand: p.brand, stock: p.stock_qty, reorder: p.reorder_level }))

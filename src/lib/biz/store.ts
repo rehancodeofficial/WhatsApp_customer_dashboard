@@ -269,6 +269,13 @@ class MemoryBizStore implements BizStore {
       }
     }
     if (o.status === 'cancelled' && patch.status && patch.status !== 'cancelled') throw new BizError('A cancelled order cannot be reopened. Create a new order.', 409);
+    // When order is delivered: release reserved_qty on each product
+    if (patch.status === 'delivered' && o.status !== 'delivered') {
+      for (const it of d.orderItems.filter((i) => i.order_id === id && i.product_id)) {
+        const prod = d.products.find((p) => p.id === it.product_id);
+        if (prod) prod.reserved_qty = Math.max(0, (prod.reserved_qty || 0) - it.quantity);
+      }
+    }
     Object.assign(o, pick(patch, ['status', 'payment_status', 'notes']), { updated_at: new Date().toISOString() });
     return { ...o, items: d.orderItems.filter((i) => i.order_id === id) };
   }
@@ -461,6 +468,18 @@ class SupabaseBizStore implements BizStore {
     if (cur.status === 'cancelled' && patch.status && patch.status !== 'cancelled') throw new BizError('A cancelled order cannot be reopened. Create a new order.', 409);
     const { data, error } = await this.db.from('orders').update(pick(patch, ['status', 'payment_status', 'notes'])).eq('id', id).select('*, order_items(*)').maybeSingle();
     fail(error, !data);
+    // When order is delivered: release reserved_qty on each product
+    if (patch.status === 'delivered' && cur.status !== 'delivered') {
+      const items: { product_id: string | null; quantity: number }[] = (data as any).order_items || [];
+      for (const item of items) {
+        if (!item.product_id) continue;
+        const { data: prod } = await this.db.from('products').select('reserved_qty').eq('id', item.product_id).single();
+        if (prod) {
+          const newReserved = Math.max(0, ((prod as any).reserved_qty || 0) - item.quantity);
+          await this.db.from('products').update({ reserved_qty: newReserved }).eq('id', item.product_id);
+        }
+      }
+    }
     return normOrder(data);
   }
 
