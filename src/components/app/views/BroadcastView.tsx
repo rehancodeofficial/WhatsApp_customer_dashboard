@@ -165,11 +165,7 @@ export function BroadcastView() {
           <Card className="xl:col-span-12 bg-gradient-to-br from-white to-orange-50/60">
             <CardHeader
               title="AI suggestions"
-              subtitle={
-                defaults.ai
-                  ? 'Gemini reviews stock, sales pace, margins and customer demand, then writes the offer.'
-                  : 'Picks from stock, sales pace, margins and customer demand. Add GEMINI_API_KEY to let Gemini write the copy.'
-              }
+              subtitle="Picks from stock, sales pace, margins and customer demand. Gemini writes the copy."
               right={
                 <Button variant="brand" onClick={getSuggestions} loading={suggLoading}>
                   <Sparkles className="w-4 h-4" /> {sugg ? 'Refresh' : 'Suggest products'}
