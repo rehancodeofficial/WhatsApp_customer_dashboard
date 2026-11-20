@@ -168,3 +168,19 @@ describe('email-only customers', () => {
     expect(h).toContain('Hi Ali,<br>&lt;b&gt;iPhone&lt;/b&gt; &amp; more');
   });
 });
+
+import { dateOrNull } from '@/lib/biz/sheet-sync';
+import { toBase } from '@/lib/fx';
+describe('n8n times and currencies', () => {
+  it('reads n8n local times as Dubai time (UTC+4)', () => {
+    expect(dateOrNull('2026-11-20 15:30')).toBe('2026-11-20T11:30:00.000Z');
+    expect(dateOrNull('2026-11-20')).toBe('2026-11-19T20:00:00.000Z');
+    expect(dateOrNull('2026-11-20T15:30:00Z')).toBe('2026-11-20T15:30:00.000Z');
+    expect(dateOrNull('')).toBeNull();
+  });
+  it('converts to the dashboard currency', () => {
+    expect(toBase(280, 'PKR', 'USD', { PKR: 280 })).toBe(1);
+    expect(toBase(5, 'USD', 'USD', null)).toBe(5);
+    expect(toBase(5, 'AED', 'USD', {})).toBeNull();
+  });
+});

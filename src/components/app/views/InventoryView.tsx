@@ -1,5 +1,5 @@
 'use client';
-import { DEFAULT_CURRENCY } from '@/lib/currency';
+import { INVENTORY_CURRENCY } from '@/lib/currency';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, Package, PackagePlus, Pencil, Plus, Wallet } from 'lucide-react';
 import type { InventoryAnalytics } from '@/lib/biz/logic';
@@ -396,8 +396,8 @@ function ProductModal({ product, suppliers, onClose, onSaved }: { product: Produ
             ))}
           </select>
         </Field>
-        <Field label="Cost price ({DEFAULT_CURRENCY})"><input type="number" min={0} className={inputCls} value={f.cost_price} onChange={set('cost_price')} /></Field>
-        <Field label="Sale price ({DEFAULT_CURRENCY})"><input type="number" min={0} className={inputCls} value={f.sale_price} onChange={set('sale_price')} /></Field>
+        <Field label={`Cost price (${product?.currency || INVENTORY_CURRENCY})`}><input type="number" min={0} className={inputCls} value={f.cost_price} onChange={set('cost_price')} /></Field>
+        <Field label={`Sale price (${product?.currency || INVENTORY_CURRENCY})`}><input type="number" min={0} className={inputCls} value={f.sale_price} onChange={set('sale_price')} /></Field>
         <Field label="Reorder level"><input type="number" min={0} className={inputCls} value={f.reorder_level} onChange={set('reorder_level')} /></Field>
         <Field label="Location"><input className={inputCls} value={f.location} onChange={set('location')} placeholder="Warehouse A" /></Field>
         {!product && <Field label="Opening stock" hint="Recorded in the movement log"><input type="number" min={0} className={inputCls} value={f.opening_stock} onChange={set('opening_stock')} /></Field>}

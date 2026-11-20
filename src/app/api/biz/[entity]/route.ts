@@ -7,6 +7,7 @@ import { bizError } from '@/lib/biz/http';
 import { CustomerBody, ENTITY_PERMS, MovementBody, OrderBody, ProductBody, SupplierBody, zodMessage } from '@/lib/biz/schemas';
 import { watchInventory } from '@/lib/biz/inventory-sync';
 import { byCode, nextInventoryId, nextSupplierCode } from '@/lib/biz/ids';
+import { INVENTORY_CURRENCY } from '@/lib/currency';
 import { pushSupplier } from '@/lib/biz/supplier-sync';
 import { logActivity } from '@/lib/security';
 
@@ -90,6 +91,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
         const { opening_stock, ...data } = p.data;
         if (!data.sku) data.sku = await nextInventoryId((await store.listProducts()).map((x) => x.sku));
+        if (!data.currency) data.currency = INVENTORY_CURRENCY;
         const product = await watchInventory('dashboard', async () => {
           const created = await store.saveProduct(null, data as any);
           if (opening_stock) {

@@ -3,7 +3,7 @@
 // to POST /api/n8n/sync/<Sheet_Name>. Partial rows (updates) only change the columns they contain.
 import { getBizStore } from './store';
 import type { CustomerRecord, Order, OrderStatus, OrderPaymentStatus, Product } from './types';
-import { DEFAULT_CURRENCY } from '@/lib/currency';
+import { DEFAULT_CURRENCY, INVENTORY_CURRENCY } from '@/lib/currency';
 import { emailKey, isEmailOnly } from './channel';
 
 export const SYNC_SHEETS = [
@@ -41,9 +41,14 @@ const intOrNull = (v: unknown) => {
   return n === null ? null : Math.round(n);
 };
 const digits = (v: unknown) => (txt(v) || '').replace(/[^0-9]/g, '');
-const dateOrNull = (v: unknown): string | null => {
-  const s = txt(v);
+// n8n writes local times without a zone ("2026-11-20 15:30") in its own time zone: Dubai (UTC+4).
+// Override with N8N_UTC_OFFSET (e.g. "+05:00") if the n8n instance time zone changes.
+const N8N_UTC_OFFSET = process.env.N8N_UTC_OFFSET || '+04:00';
+export const dateOrNull = (v: unknown): string | null => {
+  let s = txt(v);
   if (!s) return null;
+  const naive = s.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2})(:\d{2})?)?$/);
+  if (naive) s = `${naive[1]}T${(naive[2] || '00:00').padStart(5, '0')}${naive[3] || ':00'}${N8N_UTC_OFFSET}`;
   const t = Date.parse(s);
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 };
@@ -187,7 +192,7 @@ async function syncInventory(r: Row) {
   if (!p) {
     if (!fields.brand || !fields.model) throw Object.assign(new Error(`Unknown inventory ID ${sku}: send Brand and Model to add it`), { status: 404 });
     const grade = (txt(r.Grade) || '').toLowerCase();
-    p = await store.saveProduct(null, { condition: !grade || grade.startsWith('new') ? 'new' : 'refurbished', currency: DEFAULT_CURRENCY, ...fields });
+    p = await store.saveProduct(null, { condition: !grade || grade.startsWith('new') ? 'new' : 'refurbished', currency: INVENTORY_CURRENCY, ...fields });
   } else {
     p = await store.saveProduct(p.id, fields);
   }
@@ -227,7 +232,7 @@ async function syncOrder(r: Row) {
     discount: opt(r, 'Discount', numOrNull) ?? undefined,
     currency: exists ? undefined : DEFAULT_CURRENCY,
     source: exists ? undefined : 'whatsapp_ai',
-    created_at: exists ? undefined : created ?? undefined,
+    created_at: created ?? undefined, // the n8n row is the source of truth for its order date
   } as Row) as Partial<Order>;
   const order = await store.upsertOrderRecord(orderNo, fields);
   // A single-product order row (Product_ID + Quantity) becomes its line when no Order_Items exist yet.
