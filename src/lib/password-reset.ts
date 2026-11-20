@@ -3,6 +3,7 @@ import { isDemoMode } from '@/lib/config';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { listStaff, updateStaff, StaffError } from '@/lib/staff';
 import { findOwnerByEmail, maskEmail, RESET_MINUTES, sendOwnerResetLink } from '@/lib/owner-reset';
+import { logActivity, notifyOwner } from '@/lib/security';
 
 export interface PasswordResetRequest {
   id: string;
@@ -108,6 +109,7 @@ export async function requestPasswordReset(emailInput: string, reason?: string, 
         .single();
 
       if (!error && data) {
+        await announceRequest(user, reqObj.reason);
         return {
           type: 'staff_request_submitted',
           message: 'Your password reset request has been forwarded to the Admin for identity verification.',
@@ -120,6 +122,7 @@ export async function requestPasswordReset(emailInput: string, reason?: string, 
   }
 
   // In-memory fallback
+  await announceRequest(user, reqObj.reason);
   const store = getMemoryStore();
   // Filter out any older pending requests for the same user
   const idx = store.findIndex((r) => r.user_id === user.id && r.status === 'pending');
@@ -229,4 +232,14 @@ export async function fulfillPasswordResetRequest(
   }
 
   return { request: updatedReq, newPassword };
+}
+
+/** Owner bell + activity log: someone is waiting for a new password. Never throws. */
+async function announceRequest(user: { id: string; full_name: string; email: string; role: string }, reason: string | null | undefined) {
+  if (isDemoMode()) return;
+  await notifyOwner(
+    `Password reset request: ${user.full_name || user.email}`,
+    `${user.full_name || user.email} (${user.email}) asked for a new password.${reason ? `\nNote: ${reason}` : ''}\n\nCheck it is really them, then open Team & Access → Reset requests to give a new password (your authenticator code is needed).`
+  ).catch(() => {});
+  await logActivity({ id: user.id, name: user.full_name, email: user.email, role: user.role }, 'password.reset_requested', { reason: reason || null });
 }

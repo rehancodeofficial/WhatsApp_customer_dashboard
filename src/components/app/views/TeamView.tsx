@@ -6,7 +6,7 @@ import { api, Avatar, Button, Card, CardHeader, cx, dateTime, Empty, ErrorNote, 
 import { ActivityTab, CodeInput, SecurityTab, sixDigits } from './TeamSecurity';
 
 interface Role { id: string; name: string; description: string | null; permissions: string[] }
-interface Staff { id: string; email: string; full_name: string; role: 'owner' | 'agent'; role_id: string | null; active: boolean; created_at: string; last_sign_in_at?: string | null; username?: string | null }
+interface Staff { id: string; email: string; full_name: string; role: 'owner' | 'agent'; role_id: string | null; active: boolean; created_at: string; last_sign_in_at?: string | null; username?: string | null; whatsapp?: string | null }
 interface PasswordResetRequest {
   id: string;
   user_id: string;
@@ -34,7 +34,7 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
   const [addUser, setAddUser] = useState(false);
   const [pwFor, setPwFor] = useState<Staff | null>(null);
   const [verifyModalReq, setVerifyModalReq] = useState<PasswordResetRequest | null>(null);
-  const [completedCreds, setCompletedCreds] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [completedCreds, setCompletedCreds] = useState<{ name: string; email: string; password: string; whatsapp?: WaResult | null } | null>(null);
 
   const load = useCallback(() => {
     api<{ roles: Role[] }>('/api/roles').then((d) => setRoles(d.roles)).catch((e) => setErr(e.message));
@@ -117,7 +117,18 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
                           >
                             @{s.username || '—'}
                           </button>{' '}
-                          · {s.email}
+                          · {s.email} ·{' '}
+                          <button
+                            type="button"
+                            className="hover:text-orange-700"
+                            title="Change WhatsApp number"
+                            onClick={() => {
+                              const w = window.prompt(`WhatsApp number for ${s.full_name} (with country code). New passwords are sent here:`, s.whatsapp || '');
+                              if (w !== null && w.trim() !== (s.whatsapp || '')) run(() => api(`/api/staff/${s.id}`, { method: 'PATCH', body: JSON.stringify({ whatsapp: w.trim() || null }) }), `WhatsApp number of ${s.full_name} saved`);
+                            }}
+                          >
+                            {s.whatsapp ? `WhatsApp +${s.whatsapp}` : 'Add WhatsApp'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -265,9 +276,9 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
         <UserModal
           roles={roles}
           onClose={() => setAddUser(false)}
-          onSaved={() => {
+          onSaved={(w) => {
             setAddUser(false);
-            setOk('User created. Share the email and password with them.');
+            setOk('User created.' + (w?.sent ? ` Username and password were sent to their WhatsApp (+${w.to}).` : ' Share the username and password with them.'));
             load();
           }}
         />
@@ -276,9 +287,9 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
         <PasswordModal
           user={pwFor}
           onClose={() => setPwFor(null)}
-          onSaved={() => {
+          onSaved={(w) => {
             setPwFor(null);
-            setOk('Password changed');
+            setOk('Password changed.' + waLine(w));
           }}
         />
       )}
@@ -303,8 +314,10 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
               <div><b>Email:</b> {completedCreds.email}</div>
               <div><b>New Password:</b> {completedCreds.password}</div>
             </div>
-            <p className="text-slate-500">
-              Please convey this temporary password to <b>{completedCreds.name}</b> directly via trusted internal channels (WhatsApp, in person, or voice call).
+            <p className={completedCreds.whatsapp?.sent ? 'text-emerald-700' : 'text-slate-500'}>
+              {completedCreds.whatsapp?.sent
+                ? `Sent to ${completedCreds.name}'s WhatsApp (+${completedCreds.whatsapp.to}).`
+                : `Not sent on WhatsApp${completedCreds.whatsapp?.error ? ` (${completedCreds.whatsapp.error})` : ''}. Give this password to ${completedCreds.name} yourself.`}
             </p>
             <div className="flex justify-end pt-2">
               <Button onClick={() => setCompletedCreds(null)}>Done</Button>
@@ -314,6 +327,13 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
       )}
     </div>
   );
+}
+
+interface WaResult { sent: boolean; to?: string; error?: string }
+/** One line telling the Admin whether the new password reached the person on WhatsApp. */
+export function waLine(w: WaResult | null | undefined) {
+  if (!w) return '';
+  return w.sent ? ` The new password was sent to their WhatsApp (+${w.to}).` : ` Not sent on WhatsApp: ${w.error || 'unknown reason'}. Share it with them yourself.`;
 }
 
 const IconBtn = ({ children, label, onClick, danger }: { children: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) => (
@@ -329,7 +349,7 @@ function VerifyAndResetModal({
 }: {
   request: PasswordResetRequest;
   onClose: () => void;
-  onSuccess: (creds: { name: string; email: string; password: string }) => void;
+  onSuccess: (creds: { name: string; email: string; password: string; whatsapp?: WaResult | null }) => void;
 }) {
   const [pw, setPw] = useState('');
   const [notes, setNotes] = useState('Identity verified by Admin');
@@ -354,7 +374,7 @@ function VerifyAndResetModal({
     setBusy(true);
     setErr(null);
     try {
-      await api('/api/staff/reset-requests', {
+      const d = await api<{ whatsapp?: WaResult }>('/api/staff/reset-requests', {
         method: 'POST',
         body: JSON.stringify({
           requestId: request.id,
@@ -363,7 +383,7 @@ function VerifyAndResetModal({
           code,
         }),
       });
-      onSuccess({ name: request.full_name, email: request.email, password: pw });
+      onSuccess({ name: request.full_name, email: request.email, password: pw, whatsapp: d.whatsapp });
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -487,19 +507,19 @@ function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClose: () 
   );
 }
 
-function UserModal({ roles, onClose, onSaved }: { roles: Role[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ full_name: '', username: '', email: '', password: '', role: roles[0]?.id || 'owner' });
+function UserModal({ roles, onClose, onSaved }: { roles: Role[]; onClose: () => void; onSaved: (w?: WaResult | null) => void }) {
+  const [f, setF] = useState({ full_name: '', username: '', email: '', whatsapp: '', password: '', role: roles[0]?.id || 'owner' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const save = async () => {
     setBusy(true);
     setErr(null);
     try {
-      await api('/api/staff', {
+      const d = await api<{ whatsapp?: WaResult }>('/api/staff', {
         method: 'POST',
-        body: JSON.stringify({ full_name: f.full_name, username: f.username.trim() || undefined, email: f.email, password: f.password, ...(f.role === 'owner' ? { role: 'owner' } : { role: 'agent', role_id: f.role }) }),
+        body: JSON.stringify({ full_name: f.full_name, username: f.username.trim() || undefined, email: f.email, whatsapp: f.whatsapp.trim() || undefined, password: f.password, ...(f.role === 'owner' ? { role: 'owner' } : { role: 'agent', role_id: f.role }) }),
       });
-      onSaved();
+      onSaved(d.whatsapp);
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -513,6 +533,7 @@ function UserModal({ roles, onClose, onSaved }: { roles: Role[]; onClose: () => 
         <Field label="Full name"><input className={inputCls} value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></Field>
         <Field label="Username" hint="Used to sign in. Letters, numbers, dot, dash or underscore. Empty = the first part of the email."><input className={cx(inputCls, 'font-mono')} value={f.username} onChange={(e) => setF({ ...f, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })} autoComplete="off" /></Field>
         <Field label="Email" hint="Used for notifications and password help."><input type="email" className={inputCls} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+        <Field label="WhatsApp number" hint="With country code, e.g. 923001234567. Their username and password are sent here."><input inputMode="tel" className={inputCls} value={f.whatsapp} onChange={(e) => setF({ ...f, whatsapp: e.target.value })} placeholder="923001234567" /></Field>
         <Field label="Password" hint="At least 8 characters. Share it with the user privately."><input type="password" className={inputCls} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} autoComplete="new-password" /></Field>
         <Field label="Role">
           <select className={inputCls} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
@@ -530,7 +551,7 @@ function UserModal({ roles, onClose, onSaved }: { roles: Role[]; onClose: () => 
   );
 }
 
-function PasswordModal({ user, onClose, onSaved }: { user: Staff; onClose: () => void; onSaved: () => void }) {
+function PasswordModal({ user, onClose, onSaved }: { user: Staff; onClose: () => void; onSaved: (w?: WaResult | null) => void }) {
   const [pw, setPw] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -538,8 +559,8 @@ function PasswordModal({ user, onClose, onSaved }: { user: Staff; onClose: () =>
   const save = async () => {
     setBusy(true);
     try {
-      await api(`/api/staff/${user.id}`, { method: 'PATCH', body: JSON.stringify({ password: pw, code }) });
-      onSaved();
+      const d = await api<{ whatsapp?: WaResult }>(`/api/staff/${user.id}`, { method: 'PATCH', body: JSON.stringify({ password: pw, code }) });
+      onSaved(d.whatsapp);
     } catch (e: any) {
       setErr(e.message);
     } finally {

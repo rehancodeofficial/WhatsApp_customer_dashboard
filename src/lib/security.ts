@@ -3,6 +3,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { isDemoMode } from '@/lib/config';
 import { getAdminSupabase } from '@/lib/supabase/admin';
+import { sendMetaWhatsAppMessage } from '@/lib/whatsapp';
 
 export const MAX_FAILED_LOGINS = 3;
 
@@ -79,9 +80,19 @@ export async function recordSuccessfulLogin(userId: string) {
   await db().from('profiles').update({ failed_logins: 0, last_login_at: new Date().toISOString() }).eq('id', userId);
 }
 
-/** Saves the new password (encrypted) and the change time; tells the owner when staff changed it. */
-export async function recordPasswordChange(target: { id: string; name: string; email: string; role: string }, password: string, by: { id: string; name: string; role: string } | null, how: string) {
-  if (isDemoMode()) return;
+/** Result of the WhatsApp message to the person whose password changed. */
+export interface PasswordWhatsApp {
+  sent: boolean;
+  to?: string;
+  error?: string;
+}
+
+/**
+ * Saves the new password (encrypted) and the change time; tells the owner when staff changed it;
+ * WhatsApps the person: the new password when someone else (the Admin) set it, an alert when they did it themselves.
+ */
+export async function recordPasswordChange(target: { id: string; name: string; email: string; role: string }, password: string, by: { id: string; name: string; role: string } | null, how: string): Promise<PasswordWhatsApp> {
+  if (isDemoMode()) return { sent: false, error: 'demo mode' };
   const now = new Date().toISOString();
   await db().from('staff_secrets').upsert({ user_id: target.id, enc: encryptSecret(password), updated_at: now, updated_by: by?.id ?? null }, { onConflict: 'user_id' });
   await db().from('profiles').update({ password_changed_at: now }).eq('id', target.id);
@@ -90,6 +101,24 @@ export async function recordPasswordChange(target: { id: string; name: string; e
       `Password changed: ${target.name || target.email}`,
       `${target.name || target.email} (${target.email}) ${how}. The new password is in Team & Access → Security (open it with your authenticator code).`
     );
+  }
+  return whatsappPassword(target, password, !!by && by.id !== target.id);
+}
+
+async function whatsappPassword(target: { id: string; name: string }, password: string, setByAdmin: boolean): Promise<PasswordWhatsApp> {
+  const { data: p } = await db().from('profiles').select('whatsapp, username').eq('id', target.id).maybeSingle();
+  if (!p?.whatsapp) return { sent: false, error: 'No WhatsApp number saved for this user' };
+  const first = (target.name || '').split(' ')[0] || 'there';
+  const text = setByAdmin
+    ? `Hi ${first}, your Phone Buzz Dashboard password was reset by the Admin.\n\nUsername: ${p.username || '-'}\nNew password: ${password}\n\nPlease sign in and change it in Settings → Profile. Do not share this message.`
+    : `Hi ${first}, the password of your Phone Buzz Dashboard account (${p.username || '-'}) was just changed. If this was not you, tell the Admin right away.`;
+  try {
+    await sendMetaWhatsAppMessage({ to: p.whatsapp, type: 'text', text });
+    return { sent: true, to: p.whatsapp };
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    console.error('password WhatsApp failed', target.id, msg);
+    return { sent: false, to: p.whatsapp, error: /131047|24-hour/i.test(msg) ? 'WhatsApp only allows this within 24 h after they last messaged the business number' : msg };
   }
 }
 

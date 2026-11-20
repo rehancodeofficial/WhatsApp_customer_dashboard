@@ -13,6 +13,7 @@ const PatchBody = z.object({
   active: z.boolean().optional(),
   password: z.string().min(8).max(200).optional(),
   username: z.string().trim().max(30).optional(),
+  whatsapp: z.string().trim().max(30).nullable().optional(),
   code: z.string().max(10).optional(),
 });
 
@@ -29,13 +30,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (codeErr) return NextResponse.json({ error: codeErr, code_required: true }, { status: 403 });
     }
     const user = await updateStaff(v.id, id, parsed.data);
+    let whatsapp = null;
     if (parsed.data.password) {
       await getAdminSupabase().from('profiles').update({ failed_logins: 0, locked_at: null }).eq('id', id);
-      await recordPasswordChange({ id, name: user.full_name, email: user.email, role: user.role }, parsed.data.password, v, `got a new password from ${v.name}`);
+      whatsapp = await recordPasswordChange({ id, name: user.full_name, email: user.email, role: user.role }, parsed.data.password, v, `got a new password from ${v.name}`);
     }
     const { password, code, ...rest } = parsed.data as any;
-    await logActivity(v, 'staff.updated', { email: user.email, ...rest, ...(password ? { password: 'changed' } : {}) });
-    return NextResponse.json({ success: true, user });
+    await logActivity(v, 'staff.updated', { email: user.email, ...rest, ...(password ? { password: 'changed', whatsapp_sent: !!whatsapp?.sent } : {}) });
+    return NextResponse.json({ success: true, user, whatsapp });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: e instanceof StaffError ? e.status : 500 });
   }

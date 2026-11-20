@@ -18,6 +18,8 @@ export interface StaffUser {
   last_sign_in_at?: string | null;
   /** Sign-in name (unique, lower case). */
   username?: string | null;
+  /** WhatsApp number (digits with country code): new passwords from the Admin are sent here. */
+  whatsapp?: string | null;
 }
 
 export class StaffError extends Error {
@@ -101,7 +103,7 @@ async function assertNotLastAdmin(id: string, list: StaffUser[]) {
 export async function listStaff(): Promise<StaffUser[]> {
   if (isDemoMode()) return demoStaff().map(strip);
   const db = getAdminSupabase();
-  const { data: profiles, error } = await db.from('profiles').select('id, full_name, role, role_id, active, created_at, username').order('created_at');
+  const { data: profiles, error } = await db.from('profiles').select('id, full_name, role, role_id, active, created_at, username, whatsapp').order('created_at');
   if (error) throw new StaffError(error.message, 500);
   const { data: users } = await db.auth.admin.listUsers({ perPage: 1000 });
   const byId = new Map((users?.users || []).map((u) => [u.id, u]));
@@ -115,10 +117,20 @@ export async function listStaff(): Promise<StaffUser[]> {
     created_at: p.created_at,
     last_sign_in_at: byId.get(p.id)?.last_sign_in_at ?? null,
     username: p.username ?? null,
+    whatsapp: p.whatsapp ?? null,
   }));
 }
 
 const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
+/** "+92 300-1234567" → "923001234567"; a local 03xx number becomes 92…; empty → null. */
+export function cleanPhone(v: string | null | undefined) {
+  let d = String(v ?? '').replace(/[^0-9]/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  if (/^03\d{9}$/.test(d)) d = '92' + d.slice(1);
+  if (!d) return null;
+  if (d.length < 10 || d.length > 15) throw new StaffError('WhatsApp number: digits with country code, e.g. 923001234567');
+  return d;
+}
 export function cleanUsername(u: string) {
   return u.trim().toLowerCase();
 }
@@ -142,7 +154,7 @@ async function pickUsername(wanted: string | null | undefined, email: string, ex
   }
 }
 
-export async function createStaff(input: { email: string; full_name: string; password: string; role: Role; role_id?: string | null; username?: string | null }): Promise<StaffUser> {
+export async function createStaff(input: { email: string; full_name: string; password: string; role: Role; role_id?: string | null; username?: string | null; whatsapp?: string | null }): Promise<StaffUser> {
   const role_id = input.role === 'owner' ? null : input.role_id ?? null;
   const email = input.email.trim().toLowerCase();
   if (!validEmail(email)) throw new StaffError('Enter a valid email');
@@ -168,15 +180,15 @@ export async function createStaff(input: { email: string; full_name: string; pas
   // The DB trigger creates the profile; set the chosen role and name explicitly.
   const { error: pErr } = await db
     .from('profiles')
-    .upsert({ id: data.user.id, full_name: input.full_name.trim(), role: input.role, role_id, active: true, username }, { onConflict: 'id' });
+    .upsert({ id: data.user.id, full_name: input.full_name.trim(), role: input.role, role_id, active: true, username, whatsapp: cleanPhone(input.whatsapp) }, { onConflict: 'id' });
   if (pErr) throw new StaffError(pErr.message, 500);
-  return { id: data.user.id, email, full_name: input.full_name.trim(), role: input.role, role_id, active: true, created_at: data.user.created_at, username };
+  return { id: data.user.id, email, full_name: input.full_name.trim(), role: input.role, role_id, active: true, created_at: data.user.created_at, username, whatsapp: cleanPhone(input.whatsapp) };
 }
 
 export async function updateStaff(
   actorId: string | null,
   id: string,
-  changes: { full_name?: string; role?: Role; role_id?: string | null; active?: boolean; password?: string; username?: string }
+  changes: { full_name?: string; role?: Role; role_id?: string | null; active?: boolean; password?: string; username?: string; whatsapp?: string | null }
 ): Promise<StaffUser> {
   const list = await listStaff();
   const target = list.find((u) => u.id === id);
@@ -204,6 +216,7 @@ export async function updateStaff(
   if (changes.role === 'owner') patch.role_id = null;
   if (typeof changes.active === 'boolean') patch.active = changes.active;
   if (changes.username !== undefined) patch.username = await pickUsername(changes.username, target.email, id);
+  if (changes.whatsapp !== undefined) patch.whatsapp = cleanPhone(changes.whatsapp);
   if (Object.keys(patch).length) {
     const { error } = await db.from('profiles').update(patch).eq('id', id);
     if (error) throw new StaffError(error.message, 500);

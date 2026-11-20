@@ -170,8 +170,13 @@ function CodeActionModal({
         await api('/api/staff/security/unblock', { method: 'POST', body: JSON.stringify({ userId: user.id, code }) });
         onDone(`${user.name} is unblocked and can sign in again with the same password.`);
       } else {
-        await api(`/api/staff/${user.id}`, { method: 'PATCH', body: JSON.stringify({ password: pw, code }) });
-        onDone(`New password saved for ${user.name}${user.status === 'blocked' ? ' and the account is unblocked' : ''}. Share it with them directly.`, pw);
+        const d = await api<{ whatsapp?: { sent: boolean; to?: string; error?: string } }>(`/api/staff/${user.id}`, { method: 'PATCH', body: JSON.stringify({ password: pw, code }) });
+        const w = d.whatsapp;
+        onDone(
+          `New password saved for ${user.name}${user.status === 'blocked' ? ' and the account is unblocked' : ''}.` +
+            (w?.sent ? ` Sent to their WhatsApp (+${w.to}).` : ` Not sent on WhatsApp${w?.error ? `: ${w.error}` : ''}. Share it with them yourself.`),
+          pw
+        );
       }
     } catch (e: any) {
       setErr(e.message);
@@ -238,6 +243,11 @@ const ACTION_LABEL: Record<string, string> = {
   'password.changed': 'Changed own password',
   'password.reset_email': 'Reset password by email link',
   'password.reset_authenticator': 'Reset password with authenticator',
+  'password.reset_requested': 'Asked the Admin for a new password',
+  'login.trusted_device': 'Signed in on a trusted device',
+  'login.email_code': 'Signed in with an email code',
+  'login.recovery_email_wrong': 'Typed a wrong recovery email',
+  'security.device_forgotten': 'Stopped trusting a device',
   'password.viewed': 'Viewed a staff password',
   'profile.updated': 'Updated profile',
   'security.2fa_on': 'Turned on two-factor',

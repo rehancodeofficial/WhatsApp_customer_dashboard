@@ -48,12 +48,13 @@ export async function POST(req: NextRequest) {
       parsed.data.verificationNotes
     );
     const target = (await listStaff()).find((u) => u.id === res.request.user_id);
+    let whatsapp = null;
     if (target) {
       await getAdminSupabase().from('profiles').update({ failed_logins: 0, locked_at: null }).eq('id', target.id);
-      await recordPasswordChange({ id: target.id, name: target.full_name, email: target.email, role: target.role }, parsed.data.newPassword, v, `got a new password from ${v.name} (reset request)`);
+      whatsapp = await recordPasswordChange({ id: target.id, name: target.full_name, email: target.email, role: target.role }, parsed.data.newPassword, v, `got a new password from ${v.name} (reset request)`);
     }
-    await logActivity(v, 'staff.reset_request_completed', { email: target?.email });
-    return NextResponse.json({ success: true, ...res });
+    await logActivity(v, 'staff.reset_request_completed', { email: target?.email, whatsapp_sent: !!whatsapp?.sent });
+    return NextResponse.json({ success: true, ...res, whatsapp });
   } catch (e: any) {
     return NextResponse.json(
       { error: e.message },

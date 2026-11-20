@@ -11,6 +11,7 @@ const CreateBody = z.object({
   role: z.enum(['owner', 'agent']),
   role_id: z.string().uuid().nullable().optional(),
   username: z.string().trim().max(30).optional(),
+  whatsapp: z.string().trim().max(30).optional(),
 });
 
 export async function GET() {
@@ -28,9 +29,9 @@ export async function POST(req: NextRequest) {
   }
   try {
     const user = await createStaff(parsed.data);
-    await recordPasswordChange({ id: user.id, name: user.full_name, email: user.email, role: user.role }, parsed.data.password, v, `was added by ${v.name}`);
-    await logActivity(v, 'staff.created', { email: user.email, role: user.role });
-    return NextResponse.json({ success: true, user });
+    const whatsapp = await recordPasswordChange({ id: user.id, name: user.full_name, email: user.email, role: user.role }, parsed.data.password, v, `was added by ${v.name}`);
+    await logActivity(v, 'staff.created', { email: user.email, role: user.role, whatsapp_sent: whatsapp.sent });
+    return NextResponse.json({ success: true, user, whatsapp });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: e instanceof StaffError ? e.status : 500 });
   }
