@@ -304,7 +304,7 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                       <td className={cx(td, 'font-medium text-slate-800')}>{o.order_no}</td>
                       <td className={td}>{o.customer?.name || (o.customer ? contactLabel(o.customer) : '—')}</td>
                       <td className={cx(td, 'text-slate-600 max-w-56 truncate')}>{(o.items || []).map((i: any) => `${i.quantity}× ${i.description}`).join(', ')}</td>
-                      <td className={cx(td, 'tabular-nums font-medium')}>{money(o.total, o.currency)}</td>
+                      <td className={cx(td, 'tabular-nums font-medium')}>{money(o.total, o.currency || DEFAULT_CURRENCY)}</td>
                       <td className={td}>
                         <StatusDot color={st.color} label={st.label} />
                       </td>
