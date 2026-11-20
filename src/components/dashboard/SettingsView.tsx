@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, KeyRound, Mail, ShieldCheck, ShieldOff, Smartphone, User, XCircle } from 'lucide-react';
+import { CheckCircle2, KeyRound, Mail, ShieldCheck, ShieldOff, Smartphone } from 'lucide-react';
 import { api, Button, Card, CardHeader, Chip, ErrorNote, Field, inputCls, PillTabs } from '@/components/app/ui';
 
-type Tab = 'profile' | 'security' | 'system';
+type Tab = 'profile' | 'security';
 interface Profile {
   name: string;
   email: string;
@@ -12,9 +12,9 @@ interface Profile {
   recovery_email: string | null;
 }
 
-// Settings: Profile (name, recovery email, password), Security (two-factor with Microsoft Authenticator)
-// and System (how the dashboard is connected). Secrets are never sent to the browser.
-export function SettingsView({ demo, whatsappLive }: { demo: boolean; whatsappLive: boolean }) {
+// Settings: Profile (name, recovery email, password) and Security (two-factor with Microsoft Authenticator).
+// Secrets are never sent to the browser.
+export function SettingsView({ demo }: { demo: boolean; whatsappLive?: boolean }) {
   const [tab, setTab] = useState<Tab>('profile');
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -25,12 +25,10 @@ export function SettingsView({ demo, whatsappLive }: { demo: boolean; whatsappLi
           items={[
             { id: 'profile', label: 'Profile' },
             { id: 'security', label: 'Security' },
-            { id: 'system', label: 'System' },
           ]}
         />
         {tab === 'profile' && <ProfileTab />}
         {tab === 'security' && <SecurityTab demo={demo} />}
-        {tab === 'system' && <SystemTab demo={demo} whatsappLive={whatsappLive} />}
       </div>
     </div>
   );
@@ -323,32 +321,6 @@ function SecurityTab({ demo }: { demo: boolean }) {
           </div>
         </div>
       )}
-    </Card>
-  );
-}
-
-function SystemTab({ demo, whatsappLive }: { demo: boolean; whatsappLive: boolean }) {
-  const rows = [
-    { label: 'Database (Supabase)', ok: !demo, note: demo ? 'Demo mode: sample data in memory, resets on restart' : 'Connected' },
-    { label: 'WhatsApp sending', ok: whatsappLive, note: whatsappLive ? 'Replies and broadcasts go out from the business number through n8n' : 'Not configured, replies cannot be sent' },
-  ];
-  return (
-    <Card>
-      <CardHeader title="System" subtitle="How the dashboard is connected" />
-      <div className="divide-y divide-slate-100">
-        {rows.map((r) => (
-          <div key={r.label} className="py-3 flex items-start gap-3">
-            {r.ok ? <CheckCircle2 className="w-4 h-4 text-orange-600 mt-0.5" /> : <XCircle className="w-4 h-4 text-rose-500 mt-0.5" />}
-            <div>
-              <div className="text-sm font-semibold text-slate-800">{r.label}</div>
-              <div className="text-xs text-slate-500">{r.note}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-slate-500 mt-3 flex items-center gap-1.5">
-        <User className="w-3.5 h-3.5" /> Keys and secrets live in the server environment (Vercel → Settings → Environment Variables).
-      </p>
     </Card>
   );
 }
