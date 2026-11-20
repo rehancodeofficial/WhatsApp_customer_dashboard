@@ -29,7 +29,7 @@ export function n8nBridgeEnabled(): boolean {
 }
 
 /** Owner's WhatsApp number: inventory alerts go here. */
-export const OWNER_WHATSAPP_NUMBER = (process.env.OWNER_WHATSAPP_NUMBER || '923158975768').replace(/[^0-9]/g, '');
+export const OWNER_WHATSAPP_NUMBER = (process.env.OWNER_WHATSAPP_NUMBER || '971525965784').replace(/[^0-9]/g, '');
 
 export function canSendRealWhatsApp(): boolean {
   return hasDirectWhatsAppToken() || n8nBridgeEnabled();
