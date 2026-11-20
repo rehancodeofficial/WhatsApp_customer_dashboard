@@ -16,6 +16,8 @@ export interface StaffUser {
   active: boolean;
   created_at: string;
   last_sign_in_at?: string | null;
+  /** Sign-in name (unique, lower case). */
+  username?: string | null;
 }
 
 export class StaffError extends Error {
@@ -99,7 +101,7 @@ async function assertNotLastAdmin(id: string, list: StaffUser[]) {
 export async function listStaff(): Promise<StaffUser[]> {
   if (isDemoMode()) return demoStaff().map(strip);
   const db = getAdminSupabase();
-  const { data: profiles, error } = await db.from('profiles').select('id, full_name, role, role_id, active, created_at').order('created_at');
+  const { data: profiles, error } = await db.from('profiles').select('id, full_name, role, role_id, active, created_at, username').order('created_at');
   if (error) throw new StaffError(error.message, 500);
   const { data: users } = await db.auth.admin.listUsers({ perPage: 1000 });
   const byId = new Map((users?.users || []).map((u) => [u.id, u]));
@@ -112,10 +114,35 @@ export async function listStaff(): Promise<StaffUser[]> {
     active: p.active !== false,
     created_at: p.created_at,
     last_sign_in_at: byId.get(p.id)?.last_sign_in_at ?? null,
+    username: p.username ?? null,
   }));
 }
 
-export async function createStaff(input: { email: string; full_name: string; password: string; role: Role; role_id?: string | null }): Promise<StaffUser> {
+const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
+export function cleanUsername(u: string) {
+  return u.trim().toLowerCase();
+}
+/** A free username: the one asked for (must be free) or the email's first part (+ a number). */
+async function pickUsername(wanted: string | null | undefined, email: string, exceptId?: string): Promise<string> {
+  const db = getAdminSupabase();
+  const taken = async (u: string) => {
+    const { data } = await db.from('profiles').select('id').ilike('username', u).maybeSingle();
+    return !!data && data.id !== exceptId;
+  };
+  if (wanted) {
+    const u = cleanUsername(wanted);
+    if (!USERNAME_RE.test(u)) throw new StaffError('Username: 3-30 characters, only letters, numbers, dot, dash or underscore');
+    if (await taken(u)) throw new StaffError('This username is already taken', 409);
+    return u;
+  }
+  const base = email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 26) || 'user';
+  for (let n = 1; ; n++) {
+    const u = n === 1 ? base : `${base}${n}`;
+    if (!(await taken(u))) return u;
+  }
+}
+
+export async function createStaff(input: { email: string; full_name: string; password: string; role: Role; role_id?: string | null; username?: string | null }): Promise<StaffUser> {
   const role_id = input.role === 'owner' ? null : input.role_id ?? null;
   const email = input.email.trim().toLowerCase();
   if (!validEmail(email)) throw new StaffError('Enter a valid email');
@@ -130,6 +157,7 @@ export async function createStaff(input: { email: string; full_name: string; pas
   }
 
   const db = getAdminSupabase();
+  const username = await pickUsername(input.username, email);
   const { data, error } = await db.auth.admin.createUser({
     email,
     password: input.password,
@@ -140,15 +168,15 @@ export async function createStaff(input: { email: string; full_name: string; pas
   // The DB trigger creates the profile; set the chosen role and name explicitly.
   const { error: pErr } = await db
     .from('profiles')
-    .upsert({ id: data.user.id, full_name: input.full_name.trim(), role: input.role, role_id, active: true }, { onConflict: 'id' });
+    .upsert({ id: data.user.id, full_name: input.full_name.trim(), role: input.role, role_id, active: true, username }, { onConflict: 'id' });
   if (pErr) throw new StaffError(pErr.message, 500);
-  return { id: data.user.id, email, full_name: input.full_name.trim(), role: input.role, role_id, active: true, created_at: data.user.created_at };
+  return { id: data.user.id, email, full_name: input.full_name.trim(), role: input.role, role_id, active: true, created_at: data.user.created_at, username };
 }
 
 export async function updateStaff(
   actorId: string | null,
   id: string,
-  changes: { full_name?: string; role?: Role; role_id?: string | null; active?: boolean; password?: string }
+  changes: { full_name?: string; role?: Role; role_id?: string | null; active?: boolean; password?: string; username?: string }
 ): Promise<StaffUser> {
   const list = await listStaff();
   const target = list.find((u) => u.id === id);
@@ -175,6 +203,7 @@ export async function updateStaff(
   if (changes.role_id !== undefined) patch.role_id = changes.role_id;
   if (changes.role === 'owner') patch.role_id = null;
   if (typeof changes.active === 'boolean') patch.active = changes.active;
+  if (changes.username !== undefined) patch.username = await pickUsername(changes.username, target.email, id);
   if (Object.keys(patch).length) {
     const { error } = await db.from('profiles').update(patch).eq('id', id);
     if (error) throw new StaffError(error.message, 500);

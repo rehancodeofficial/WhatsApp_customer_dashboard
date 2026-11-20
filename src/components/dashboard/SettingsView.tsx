@@ -8,6 +8,7 @@ type Tab = 'profile' | 'security';
 interface Profile {
   name: string;
   email: string;
+  username?: string | null;
   role: string;
   recovery_email: string | null;
 }
@@ -116,9 +117,14 @@ function ProfileTab() {
           <Field label="Full name">
             <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Sign-in email" hint="Used to sign in. Ask support to change it.">
-            <input className={inputCls + ' bg-slate-50 text-slate-500'} value={p?.email || ''} readOnly />
-          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Username" hint="You sign in with this. The Admin can change it in Team & Access.">
+              <input className={inputCls + ' bg-slate-50 text-slate-500 font-mono'} value={p?.username || ''} readOnly />
+            </Field>
+            <Field label="Email" hint="For notifications and password help.">
+              <input className={inputCls + ' bg-slate-50 text-slate-500'} value={p?.email || ''} readOnly />
+            </Field>
+          </div>
           {p?.role === 'owner' && (
             <Field label="Recovery email (Outlook)" hint="“Forgot password?” sends a reset link here. The link works once and expires after 15 minutes.">
               <div className="relative">

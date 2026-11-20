@@ -6,7 +6,7 @@ import { api, Avatar, Button, Card, CardHeader, cx, dateTime, Empty, ErrorNote, 
 import { ActivityTab, CodeInput, SecurityTab, sixDigits } from './TeamSecurity';
 
 interface Role { id: string; name: string; description: string | null; permissions: string[] }
-interface Staff { id: string; email: string; full_name: string; role: 'owner' | 'agent'; role_id: string | null; active: boolean; created_at: string; last_sign_in_at?: string | null }
+interface Staff { id: string; email: string; full_name: string; role: 'owner' | 'agent'; role_id: string | null; active: boolean; created_at: string; last_sign_in_at?: string | null; username?: string | null }
 interface PasswordResetRequest {
   id: string;
   user_id: string;
@@ -105,7 +105,20 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
                       <Avatar name={s.full_name} size={36} />
                       <div>
                         <div className="font-medium text-slate-800">{s.full_name} {s.id === currentUserId && <span className="text-xs text-slate-400">(you)</span>}</div>
-                        <div className="text-xs text-slate-500">{s.email}</div>
+                        <div className="text-xs text-slate-500">
+                          <button
+                            type="button"
+                            className="font-mono text-slate-700 hover:text-orange-700"
+                            title="Change username"
+                            onClick={() => {
+                              const u = window.prompt(`Username for ${s.full_name} (used to sign in):`, s.username || '');
+                              if (u && u.trim() && u.trim() !== s.username) run(() => api(`/api/staff/${s.id}`, { method: 'PATCH', body: JSON.stringify({ username: u.trim() }) }), `Username of ${s.full_name} is now ${u.trim().toLowerCase()}`);
+                            }}
+                          >
+                            @{s.username || '—'}
+                          </button>{' '}
+                          · {s.email}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -475,7 +488,7 @@ function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClose: () 
 }
 
 function UserModal({ roles, onClose, onSaved }: { roles: Role[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ full_name: '', email: '', password: '', role: roles[0]?.id || 'owner' });
+  const [f, setF] = useState({ full_name: '', username: '', email: '', password: '', role: roles[0]?.id || 'owner' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const save = async () => {
@@ -484,7 +497,7 @@ function UserModal({ roles, onClose, onSaved }: { roles: Role[]; onClose: () => 
     try {
       await api('/api/staff', {
         method: 'POST',
-        body: JSON.stringify({ full_name: f.full_name, email: f.email, password: f.password, ...(f.role === 'owner' ? { role: 'owner' } : { role: 'agent', role_id: f.role }) }),
+        body: JSON.stringify({ full_name: f.full_name, username: f.username.trim() || undefined, email: f.email, password: f.password, ...(f.role === 'owner' ? { role: 'owner' } : { role: 'agent', role_id: f.role }) }),
       });
       onSaved();
     } catch (e: any) {
@@ -498,7 +511,8 @@ function UserModal({ roles, onClose, onSaved }: { roles: Role[]; onClose: () => 
       <ErrorNote text={err} />
       <div className="space-y-3">
         <Field label="Full name"><input className={inputCls} value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></Field>
-        <Field label="Email"><input type="email" className={inputCls} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+        <Field label="Username" hint="Used to sign in. Letters, numbers, dot, dash or underscore. Empty = the first part of the email."><input className={cx(inputCls, 'font-mono')} value={f.username} onChange={(e) => setF({ ...f, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })} autoComplete="off" /></Field>
+        <Field label="Email" hint="Used for notifications and password help."><input type="email" className={inputCls} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
         <Field label="Password" hint="At least 8 characters. Share it with the user privately."><input type="password" className={inputCls} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} autoComplete="new-password" /></Field>
         <Field label="Role">
           <select className={inputCls} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>

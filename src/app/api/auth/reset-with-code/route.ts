@@ -5,13 +5,14 @@ import { isDemoMode } from '@/lib/config';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { rateLimit } from '@/lib/rate-limit';
 import { clean, sixDigits } from '@/lib/mfa';
-import { findUserIdByEmail, getProfile, ipOf, logActivity, recordFailedLogin, recordPasswordChange } from '@/lib/security';
+import { getProfile, ipOf, logActivity, recordFailedLogin, recordPasswordChange, resolveLogin } from '@/lib/security';
 
 // Forgot password, for anyone with Microsoft Authenticator on: email + current 6-digit code + new password.
 // The code is checked by Supabase MFA on a one-off session (magic-link token made on the server, never emailed).
 // A wrong code counts as a failed sign-in (3 → blocked). A blocked account cannot reset itself: the Admin must.
 const Body = z.object({
-  email: z.string().email('Enter your email'),
+  // username (preferred) or email
+  email: z.string().trim().min(1, 'Enter your username').max(150),
   code: z.string().max(10),
   password: z.string().min(8, 'New password: at least 8 characters').max(200),
 });
@@ -23,10 +24,10 @@ export async function POST(req: NextRequest) {
   const p = Body.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ error: p.error.issues[0]?.message }, { status: 400 });
   if (!sixDigits(p.data.code)) return NextResponse.json({ error: 'Enter the 6-digit code from Microsoft Authenticator' }, { status: 400 });
-  const email = p.data.email.trim().toLowerCase();
   const generic = 'This account cannot be reset with an authenticator code. Ask the Admin.';
-
-  const userId = await findUserIdByEmail(email);
+  const acct = await resolveLogin(p.data.email);
+  const email = acct?.email || '';
+  const userId = acct?.userId || null;
   const prof = userId ? await getProfile(userId) : null;
   if (!userId || !prof || prof.active === false) return NextResponse.json({ error: generic }, { status: 400 });
   if (prof.locked_at) return NextResponse.json({ error: 'This account is blocked after 3 wrong attempts. Only the Admin can unblock it.', blocked: true }, { status: 423 });

@@ -11,8 +11,8 @@ export async function GET() {
   const v = await getViewer();
   if (!v) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   if (isDemoMode()) return NextResponse.json({ name: v.name, email: v.email, role: v.role, recovery_email: null });
-  const { data } = await getAdminSupabase().from('profiles').select('full_name, recovery_email').eq('id', v.id).maybeSingle();
-  return NextResponse.json({ name: data?.full_name || v.name, email: v.email, role: v.role, recovery_email: data?.recovery_email ?? null });
+  const { data } = await getAdminSupabase().from('profiles').select('full_name, recovery_email, username').eq('id', v.id).maybeSingle();
+  return NextResponse.json({ name: data?.full_name || v.name, email: v.email, username: data?.username ?? null, role: v.role, recovery_email: data?.recovery_email ?? null });
 }
 
 const Body = z.object({

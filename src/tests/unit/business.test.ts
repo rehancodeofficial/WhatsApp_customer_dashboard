@@ -184,3 +184,17 @@ describe('n8n times and currencies', () => {
     expect(toBase(5, 'AED', 'USD', {})).toBeNull();
   });
 });
+
+import { emailMfaOk, makeEmailMfaCookie } from '@/lib/mfa-cookie';
+describe('email sign-in code cookie', () => {
+  it('is accepted only for the same user and only untouched', async () => {
+    process.env.PASSWORD_VAULT_KEY = 'test-key';
+    const c = await makeEmailMfaCookie('user-1');
+    expect(await emailMfaOk(c, 'user-1')).toBe(true);
+    expect(await emailMfaOk(c, 'user-2')).toBe(false);
+    const [u, exp, sig] = c.split('.');
+    expect(await emailMfaOk(`${u}.${Number(exp) + 1000}.${sig}`, 'user-1')).toBe(false);
+    expect(await emailMfaOk(`${u}.${Date.now() - 1}.${sig}`, 'user-1')).toBe(false);
+    expect(await emailMfaOk(undefined, 'user-1')).toBe(false);
+  });
+});

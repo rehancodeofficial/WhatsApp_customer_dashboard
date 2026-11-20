@@ -12,6 +12,7 @@ const PatchBody = z.object({
   role_id: z.string().uuid().nullable().optional(),
   active: z.boolean().optional(),
   password: z.string().min(8).max(200).optional(),
+  username: z.string().trim().max(30).optional(),
   code: z.string().max(10).optional(),
 });
 

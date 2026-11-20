@@ -38,6 +38,21 @@ export async function findUserIdByEmail(email: string): Promise<string | null> {
   return data?.users.find((u) => (u.email || '').toLowerCase() === e)?.id ?? null;
 }
 
+/** Sign-in name → account. Accepts the username (preferred) or the email. */
+export async function resolveLogin(identifier: string): Promise<{ userId: string; email: string } | null> {
+  const id = identifier.trim().toLowerCase();
+  if (!id) return null;
+  const { data } = await db().auth.admin.listUsers({ perPage: 1000 });
+  const users = data?.users || [];
+  if (id.includes('@')) {
+    const u = users.find((x) => (x.email || '').toLowerCase() === id);
+    return u ? { userId: u.id, email: u.email || '' } : null;
+  }
+  const { data: prof } = await db().from('profiles').select('id').ilike('username', id).maybeSingle();
+  const u = prof ? users.find((x) => x.id === prof.id) : null;
+  return u ? { userId: u.id, email: u.email || '' } : null;
+}
+
 export async function getProfile(userId: string) {
   const { data } = await db().from('profiles').select('id, full_name, role, active, failed_logins, locked_at').eq('id', userId).maybeSingle();
   return data as { id: string; full_name: string; role: string; active: boolean; failed_logins: number; locked_at: string | null } | null;
