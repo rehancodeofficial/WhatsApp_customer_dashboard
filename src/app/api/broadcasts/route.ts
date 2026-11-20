@@ -5,6 +5,7 @@ import { sendBroadcast } from '@/lib/biz/service';
 import { bizError } from '@/lib/biz/http';
 import { BroadcastBody, zodMessage } from '@/lib/biz/schemas';
 import { rateLimit } from '@/lib/rate-limit';
+import { logActivity } from '@/lib/security';
 
 export const maxDuration = 300; // sending to many customers takes a while
 
@@ -36,7 +37,9 @@ export async function POST(req: NextRequest) {
   const p = BroadcastBody.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
   try {
-    return NextResponse.json({ broadcast: await sendBroadcast({ ...(p.data as any), created_by: v.id }) });
+    const broadcast = await sendBroadcast({ ...(p.data as any), created_by: v.id });
+    await logActivity(v, 'broadcast.sent', { title: broadcast.title, recipients: broadcast.total_recipients, sent: broadcast.sent_count, failed: broadcast.failed_count });
+    return NextResponse.json({ broadcast });
   } catch (e) {
     return bizError(e);
   }

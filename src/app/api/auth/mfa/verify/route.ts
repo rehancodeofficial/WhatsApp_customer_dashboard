@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { clean, mfaState, sixDigits } from '@/lib/mfa';
+import { getProfile, ipOf, recordFailedLogin, recordSuccessfulLogin } from '@/lib/security';
 
 // Login step 2: { code } from the authenticator app upgrades the session to aal2.
 export async function POST(req: NextRequest) {
@@ -12,7 +13,20 @@ export async function POST(req: NextRequest) {
   const { data: user } = await s.supabase.auth.getUser();
   if (!user.user) return NextResponse.json({ error: 'Your sign-in expired. Enter your password again.' }, { status: 401 });
   if (!s.factorId) return NextResponse.json({ success: true });
+  const prof = await getProfile(user.user.id);
+  if (prof?.locked_at) {
+    await s.supabase.auth.signOut();
+    return NextResponse.json({ error: 'This account is blocked. Ask the Admin to unblock it.', blocked: true }, { status: 423 });
+  }
   const { error } = await s.supabase.auth.mfa.challengeAndVerify({ factorId: s.factorId, code: clean(body.code) });
-  if (error) return NextResponse.json({ error: 'Wrong or expired code. Try the current code in the app.' }, { status: 401 });
+  if (error) {
+    const blocked = await recordFailedLogin(user.user.id, user.user.email || '', ipOf(req) || '', 'authenticator code');
+    if (blocked) {
+      await s.supabase.auth.signOut();
+      return NextResponse.json({ error: 'This account is blocked after 3 wrong attempts. Ask the Admin to unblock it.', blocked: true }, { status: 423 });
+    }
+    return NextResponse.json({ error: 'Wrong or expired code. Try the current code in the app.' }, { status: 401 });
+  }
+  await recordSuccessfulLogin(user.user.id);
   return NextResponse.json({ success: true });
 }

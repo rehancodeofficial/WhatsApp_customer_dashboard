@@ -3,6 +3,7 @@ import { SetModeSchema } from '@/lib/validations';
 import { requireViewer } from '@/lib/auth';
 import { getRepo } from '@/lib/repo';
 import { defaultModeReason } from '@/lib/repo/logic';
+import { logActivity } from '@/lib/security';
 
 // Pause (mode "human") or resume (mode "ai") the AI for ONE conversation.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const resumeAt = mode !== 'ai' && resume_in_minutes ? new Date(Date.now() + resume_in_minutes * 60000).toISOString() : null;
   try {
     const conversation = await repo.setMode(id, mode, viewer.id, reason || defaultModeReason(mode), resumeAt);
+    await logActivity(viewer, 'chat.mode_changed', { conversation_id: conversation?.id, mode: conversation?.mode });
     return NextResponse.json({ success: true, conversation });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

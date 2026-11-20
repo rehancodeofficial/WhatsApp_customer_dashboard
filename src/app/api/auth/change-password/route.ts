@@ -5,6 +5,7 @@ import { getViewer } from '@/lib/auth';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { rateLimit } from '@/lib/rate-limit';
 import { requireCodeIfEnabled } from '@/lib/mfa';
+import { ipOf, logActivity, recordPasswordChange } from '@/lib/security';
 
 const Body = z.object({ current: z.string().min(1, 'Enter your current password').max(200), password: z.string().min(8, 'New password: at least 8 characters').max(200), code: z.string().max(10).optional() });
 
@@ -24,5 +25,7 @@ export async function POST(req: NextRequest) {
   if (codeErr) return NextResponse.json({ error: codeErr, code_required: true }, { status: 403 });
   const { error } = await getAdminSupabase().auth.admin.updateUserById(v.id, { password: p.data.password });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await recordPasswordChange({ id: v.id, name: v.name, email: v.email, role: v.role }, p.data.password, v, 'changed their own password in Settings');
+  await logActivity(v, 'password.changed', {}, ipOf(req));
   return NextResponse.json({ success: true });
 }

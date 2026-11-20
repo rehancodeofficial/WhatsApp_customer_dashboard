@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireViewer } from '@/lib/auth';
 import { getRepo } from '@/lib/repo';
 import { isDemoMode } from '@/lib/config';
+import { logActivity } from '@/lib/security';
 
 // "Resume and let AI reply now": turns the AI back on and asks n8n to answer the
 // customer's latest message right away (n8n webhook "Run AI Now").
@@ -39,5 +40,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }),
   }).catch((e) => ({ ok: false, status: 0, statusText: String(e) }) as Response);
   if (!res.ok) return NextResponse.json({ error: `n8n webhook failed (${res.status})` }, { status: 502 });
+  await logActivity(viewer, 'chat.ai_reply_requested', { wa_id });
   return NextResponse.json({ success: true, triggered: true });
 }

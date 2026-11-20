@@ -92,7 +92,7 @@ export function NotificationBell({ data, onOpen, onSeeAll }: { data: { unread: n
                       <span className="text-sm font-medium text-slate-800 truncate">{n.title}</span>
                       <span className="text-[11px] text-slate-400 shrink-0">{ago(n.created_at)}</span>
                     </span>
-                    <span className="block text-xs text-slate-500 line-clamp-2 mt-0.5 whitespace-pre-line">{n.body.split('\n').filter(Boolean).slice(1).join(' · ')}</span>
+                    <span className="block text-[11px] font-medium text-orange-600 mt-0.5">Read full →</span>
                   </span>
                 </button>
               ))
@@ -200,22 +200,27 @@ export function NotificationsView({
         ) : (
           <div className="divide-y divide-slate-100 -mx-2">
             {list.map((n) => (
-              <button key={n.id} onClick={() => onOpen(n)} className={cx('w-full text-left px-3 py-3 rounded-2xl hover:bg-slate-50 flex gap-3', !n.read_at && 'bg-orange-50/40')}>
+              // Only the subject here; "Read full" opens the whole message in the notification pane.
+              <div key={n.id} className={cx('px-3 py-3 rounded-2xl hover:bg-slate-50 flex gap-3', !n.read_at && 'bg-orange-50/40')}>
                 <span className={cx('mt-2 w-2 h-2 rounded-full shrink-0', n.read_at ? 'bg-slate-200' : 'bg-orange-500')} />
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="text-sm font-semibold text-slate-800">{n.title}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <button onClick={() => onOpen(n)} className="text-sm font-semibold text-slate-800 text-left hover:text-orange-700 min-w-0 break-words">
+                      {n.title}
+                    </button>
                     <TypeDot type={n.type} />
-                    <span className="text-xs text-slate-400 ml-auto">{dateTime(n.created_at)}</span>
-                  </span>
-                  <span className="block text-xs text-slate-600 mt-1 line-clamp-3 whitespace-pre-line">{n.body}</span>
-                  <span className="flex flex-wrap gap-3 mt-1.5 text-[11px] text-slate-500">
+                    <span className="text-xs text-slate-400 ml-auto whitespace-nowrap">{dateTime(n.created_at)}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-slate-500">
                     {n.wa_id && <span>+{n.wa_id}</span>}
                     {n.order_no && <span>{n.order_no}</span>}
                     {n.request_code && <span>{n.request_code}</span>}
-                  </span>
-                </span>
-              </button>
+                    <button onClick={() => onOpen(n)} className="ml-auto text-xs font-semibold text-orange-600 hover:text-orange-700">
+                      Read full →
+                    </button>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         )}

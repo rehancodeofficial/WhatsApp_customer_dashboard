@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/lib/auth';
 import { createStaff, listStaff, StaffError } from '@/lib/staff';
+import { logActivity, recordPasswordChange } from '@/lib/security';
 
 const CreateBody = z.object({
   email: z.string().email(),
@@ -25,7 +26,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Fill in name, a valid email, a password of 8+ characters and a role' }, { status: 400 });
   }
   try {
-    return NextResponse.json({ success: true, user: await createStaff(parsed.data) });
+    const user = await createStaff(parsed.data);
+    await recordPasswordChange({ id: user.id, name: user.full_name, email: user.email, role: user.role }, parsed.data.password, v, `was added by ${v.name}`);
+    await logActivity(v, 'staff.created', { email: user.email, role: user.role });
+    return NextResponse.json({ success: true, user });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: e instanceof StaffError ? e.status : 500 });
   }

@@ -32,3 +32,12 @@ export async function requireCodeIfEnabled(code: unknown): Promise<string | null
   const { error } = await s.supabase.auth.mfa.challengeAndVerify({ factorId: s.factorId, code: clean(code) });
   return error ? 'Wrong or expired authenticator code. Try the current code in the app.' : null;
 }
+
+/** Admin actions on other people's accounts (view password, set password, unblock) always need 2FA. */
+export async function requireOwnCode(code: unknown): Promise<string | null> {
+  const s = await mfaState();
+  if (!s.enabled || !s.factorId) return 'Turn on two-factor sign-in first (Settings → Security). It is needed to view or change staff passwords.';
+  if (!sixDigits(code)) return 'Enter the 6-digit code from Microsoft Authenticator.';
+  const { error } = await s.supabase.auth.mfa.challengeAndVerify({ factorId: s.factorId, code: clean(code) });
+  return error ? 'Wrong or expired authenticator code.' : null;
+}

@@ -11,7 +11,10 @@ const DEMO = [
 
 function LoginForm() {
   const params = useSearchParams();
-  const [mode, setMode] = useState<'login' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'forgot' | 'authreset'>('login');
+  const [newPw, setNewPw] = useState('');
+  const [newPw2, setNewPw2] = useState('');
+  const [resetCode, setResetCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
@@ -187,6 +190,22 @@ function LoginForm() {
           </ul>
         </div>
 
+        <button
+          type="button"
+          onClick={() => {
+            setMode('authreset');
+            setError(null);
+            setSuccessMsg(null);
+          }}
+          className="w-full flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 hover:bg-orange-100 px-3 py-2.5 text-left"
+        >
+          <ShieldCheck className="w-5 h-5 text-orange-600 shrink-0" />
+          <span className="text-xs text-slate-700">
+            <b className="block text-slate-800">Have Microsoft Authenticator?</b>
+            Reset your password yourself with the 6-digit code, no waiting for the Admin.
+          </span>
+        </button>
+
         {successMsg ? (
           <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800 text-xs space-y-2">
             <div className="flex items-center gap-2 font-semibold text-sm text-emerald-900">
@@ -245,6 +264,84 @@ function LoginForm() {
             >
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
               Send Password Reset Request
+            </button>
+          </form>
+        )}
+      </div>
+    );
+  }
+
+  if (mode === 'authreset') {
+    const submitAuthReset = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      if (newPw.length < 8) return setError('New password: at least 8 characters.');
+      if (newPw !== newPw2) return setError('The two new passwords are not the same.');
+      setBusy(true);
+      try {
+        const res = await fetch('/api/auth/reset-with-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code: resetCode, password: newPw }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return setError(data.error || 'Could not reset the password.');
+        setSuccessMsg('Password changed. Sign in with your new password.');
+        setPassword('');
+        setNewPw('');
+        setNewPw2('');
+        setResetCode('');
+      } finally {
+        setBusy(false);
+      }
+    };
+    const field = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500';
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => {
+            setMode('forgot');
+            setError(null);
+            setSuccessMsg(null);
+          }}
+          className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Back
+        </button>
+        {successMsg ? (
+          <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800 text-xs space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-sm text-emerald-900">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Password changed
+            </div>
+            <p>{successMsg}</p>
+            <button type="button" onClick={() => { setMode('login'); setSuccessMsg(null); }} className="mt-2 w-full py-2 bg-emerald-600 text-white rounded-lg font-semibold text-xs hover:bg-emerald-700">
+              Back to sign in
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submitAuthReset} className="space-y-3">
+            <p className="text-xs text-slate-500">Open Microsoft Authenticator and use the current code for <b>Phone Buzz Dashboard</b>. 3 wrong codes block the account until the Admin unblocks it.</p>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="ar-email">Email</label>
+              <input id="ar-email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="ar-code">Authenticator code</label>
+              <input id="ar-code" inputMode="numeric" autoComplete="one-time-code" maxLength={7} required value={resetCode} onChange={(e) => setResetCode(e.target.value.replace(/[^0-9 ]/g, ''))} placeholder="123 456" className={field + ' text-center font-mono tracking-[0.4em] text-base'} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="ar-pw">New password</label>
+              <input id="ar-pw" type="password" autoComplete="new-password" required value={newPw} onChange={(e) => setNewPw(e.target.value)} className={field} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="ar-pw2">Repeat new password</label>
+              <input id="ar-pw2" type="password" autoComplete="new-password" required value={newPw2} onChange={(e) => setNewPw2(e.target.value)} className={field} />
+            </div>
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <button type="submit" disabled={busy || resetCode.replace(/\s/g, '').length !== 6} className="w-full rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold py-2.5 flex items-center justify-center gap-2 disabled:opacity-60">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+              Reset password
             </button>
           </form>
         )}

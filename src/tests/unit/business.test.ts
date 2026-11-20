@@ -137,3 +137,16 @@ describe('broadcast offer as a template variable', () => {
     expect(offerVariable('x'.repeat(2000)).length).toBe(850);
   });
 });
+
+import { decryptSecret, encryptSecret } from '@/lib/security';
+describe('password vault', () => {
+  it('encrypts so the stored text is not the password, and decrypts back', () => {
+    process.env.PASSWORD_VAULT_KEY = 'test-key';
+    const a = encryptSecret('S3cret pass!');
+    const b = encryptSecret('S3cret pass!');
+    expect(a).not.toContain('S3cret');
+    expect(a).not.toBe(b); // random IV
+    expect(decryptSecret(a)).toBe('S3cret pass!');
+    expect(() => decryptSecret(a.slice(0, -2) + 'xx')).toThrow();
+  });
+});

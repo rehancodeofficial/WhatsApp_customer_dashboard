@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getViewer } from '@/lib/auth';
 import { clean, mfaState, sixDigits } from '@/lib/mfa';
+import { logActivity } from '@/lib/security';
 
 // Settings → Security → "Turn off": needs a current code from the app.
 export async function POST(req: NextRequest) {
@@ -16,5 +17,6 @@ export async function POST(req: NextRequest) {
     const { error } = await s.supabase.auth.mfa.unenroll({ factorId: f.id });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  await logActivity(v, 'security.2fa_off', {});
   return NextResponse.json({ success: true });
 }

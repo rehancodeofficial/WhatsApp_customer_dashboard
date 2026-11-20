@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/lib/auth';
 import { createRole, listRoles, RoleError } from '@/lib/roles';
+import { logActivity } from '@/lib/security';
 
 const Body = z.object({
   name: z.string().min(1).max(60),
@@ -21,7 +22,9 @@ export async function POST(req: NextRequest) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Enter a role name and pick permissions' }, { status: 400 });
   try {
-    return NextResponse.json({ role: await createRole(parsed.data) });
+    const role = await createRole(parsed.data);
+    await logActivity(v, 'role.created', { name: role.name });
+    return NextResponse.json({ role });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: e instanceof RoleError ? e.status : 500 });
   }

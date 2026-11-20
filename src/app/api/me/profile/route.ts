@@ -4,6 +4,7 @@ import { getViewer } from '@/lib/auth';
 import { isDemoMode } from '@/lib/config';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { requireCodeIfEnabled } from '@/lib/mfa';
+import { logActivity } from '@/lib/security';
 
 // Settings → Profile: own name, and (Admin only) the recovery email for password reset links.
 export async function GET() {
@@ -38,5 +39,6 @@ export async function PATCH(req: NextRequest) {
   if (!Object.keys(patch).length) return NextResponse.json({ success: true });
   const { error } = await getAdminSupabase().from('profiles').update(patch).eq('id', v.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await logActivity(v, 'profile.updated', { fields: Object.keys(patch) });
   return NextResponse.json({ success: true });
 }

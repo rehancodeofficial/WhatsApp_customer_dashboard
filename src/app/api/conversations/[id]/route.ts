@@ -4,6 +4,7 @@ import { getRepo } from '@/lib/repo';
 import { can } from '@/lib/permissions';
 import { getViewer } from '@/lib/auth';
 import { canReadAnyChat, canReadParty } from '@/lib/chat-access';
+import { logActivity } from '@/lib/security';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
@@ -30,5 +31,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!can(viewer, 'chats.organize')) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   const conversation = await getRepo().patchConversation(viewer, id, body);
   if (!conversation) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+  await logActivity(viewer, 'chat.organized', { conversation_id: conversation?.id, starred: conversation?.is_starred, archived: conversation?.is_archived });
   return NextResponse.json({ success: true, conversation });
 }

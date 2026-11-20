@@ -6,6 +6,7 @@ import { DEMO_COOKIE, createDemoSession } from '@/lib/demo-session';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { rateLimit } from '@/lib/rate-limit';
+import { findUserIdByEmail, getProfile, ipOf, logActivity, MAX_FAILED_LOGINS, recordFailedLogin, recordSuccessfulLogin } from '@/lib/security';
 
 const Body = z.object({ email: z.string().email(), password: z.string().min(1).max(200) });
 
@@ -27,16 +28,40 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
+  const ipAddr = ipOf(req);
+  // Blocked after 3 wrong passwords: stays blocked until an Admin unblocks it or sets a new password.
+  const userId = await findUserIdByEmail(email);
+  const before = userId ? await getProfile(userId) : null;
+  if (before?.locked_at) {
+    await logActivity({ id: before.id, name: before.full_name, email, role: before.role }, 'login.blocked_attempt', {}, ipAddr);
+    return NextResponse.json({ error: BLOCKED_MSG(before.role), blocked: true }, { status: 423 });
+  }
+
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error || !data.user) return NextResponse.json({ error: 'Wrong email or password' }, { status: 401 });
-  const { data: profile } = await getAdminSupabase().from('profiles').select('role, active').eq('id', data.user.id).maybeSingle();
+  if (error || !data.user) {
+    if (userId) {
+      const blocked = await recordFailedLogin(userId, email, ipAddr || '');
+      if (blocked) return NextResponse.json({ error: BLOCKED_MSG(before?.role), blocked: true }, { status: 423 });
+      const left = MAX_FAILED_LOGINS - ((before?.failed_logins || 0) + 1);
+      return NextResponse.json({ error: `Wrong email or password. ${left} ${left === 1 ? 'try' : 'tries'} left before the account is blocked.` }, { status: 401 });
+    }
+    return NextResponse.json({ error: 'Wrong email or password' }, { status: 401 });
+  }
+  const { data: profile } = await getAdminSupabase().from('profiles').select('role, active, full_name, role_id').eq('id', data.user.id).maybeSingle();
   if (!profile || profile.active === false) {
     await supabase.auth.signOut();
     return NextResponse.json({ error: 'This account has no dashboard access. Ask an Admin.' }, { status: 403 });
   }
+  await recordSuccessfulLogin(data.user.id);
+  await logActivity({ id: data.user.id, name: profile.full_name, email, role: profile.role }, 'login', {}, ipAddr);
   // Two-factor on: the password was right, now the app code is needed (login step 2).
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') return NextResponse.json({ success: true, mfa_required: true });
   return NextResponse.json({ success: true, role: profile.role });
 }
+
+const BLOCKED_MSG = (role?: string | null) =>
+  role === 'owner'
+    ? 'This account is blocked after 3 wrong passwords. Use "Forgot password?" to get a reset link by email.'
+    : 'This account is blocked after 3 wrong passwords. Ask the Admin to unblock it or set a new password.';

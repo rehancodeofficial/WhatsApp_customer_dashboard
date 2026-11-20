@@ -48,11 +48,12 @@ export const SECTIONS: { id: Section; label: string; icon: Icon; perm: string; g
   { id: 'sourcing', label: 'Supplier Requests', icon: ClipboardList, perm: 'suppliers.view', group: 'Records' },
   { id: 'broadcast', label: 'Broadcast', icon: Megaphone, perm: 'broadcast.send', group: 'Marketing' },
   { id: 'team', label: 'Team & Access', icon: ShieldCheck, perm: 'staff.manage', group: 'Admin' },
-  { id: 'settings', label: 'Settings', icon: Settings, perm: 'settings.view', group: 'Admin' },
+  // Everyone: own profile, password and two-factor sign-in.
+  { id: 'settings', label: 'Settings', icon: Settings, perm: '*', group: 'Account' },
 ];
 
 export function allowedSections(perms: Set<string>) {
-  return SECTIONS.filter((s) => perms.has(s.perm));
+  return SECTIONS.filter((s) => s.perm === '*' || perms.has(s.perm));
 }
 
 export function Logo({ size = 40 }: { size?: number }) {

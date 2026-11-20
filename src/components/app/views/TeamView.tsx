@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Check, KeyRound, Plus, ShieldCheck, Trash2, UserCheck, UserX, Clock, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { PERMISSION_GROUPS } from '@/lib/permissions';
 import { api, Avatar, Button, Card, CardHeader, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, PageHeader, PillTabs, StatusDot, Table, td } from '../ui';
+import { ActivityTab, CodeInput, SecurityTab, sixDigits } from './TeamSecurity';
 
 interface Role { id: string; name: string; description: string | null; permissions: string[] }
 interface Staff { id: string; email: string; full_name: string; role: 'owner' | 'agent'; role_id: string | null; active: boolean; created_at: string; last_sign_in_at?: string | null }
@@ -23,7 +24,7 @@ interface PasswordResetRequest {
 }
 
 export function TeamView({ currentUserId }: { currentUserId: string }) {
-  const [tab, setTab] = useState<'users' | 'roles' | 'resets'>('users');
+  const [tab, setTab] = useState<'users' | 'security' | 'activity' | 'roles' | 'resets'>('users');
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [staff, setStaff] = useState<Staff[] | null>(null);
   const [resetRequests, setResetRequests] = useState<PasswordResetRequest[] | null>(null);
@@ -67,9 +68,11 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
           <>
             <PillTabs
               value={tab}
-              onChange={(t) => setTab(t as 'users' | 'roles' | 'resets')}
+              onChange={(t) => setTab(t as typeof tab)}
               items={[
                 { id: 'users', label: 'Users', count: staff?.length },
+                { id: 'security', label: 'Security' },
+                { id: 'activity', label: 'Activity log' },
                 { id: 'roles', label: 'Roles & permissions', count: roles?.length },
                 { id: 'resets', label: 'Reset requests', count: pendingCount > 0 ? pendingCount : undefined },
               ]}
@@ -85,6 +88,9 @@ export function TeamView({ currentUserId }: { currentUserId: string }) {
       />
       <ErrorNote text={err} />
       {ok && <div className="rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-2.5 mb-4">{ok}</div>}
+
+      {tab === 'security' && <SecurityTab />}
+      {tab === 'activity' && <ActivityTab users={(staff || []).map((u) => ({ id: u.id, name: u.full_name }))} />}
 
       {tab === 'users' && (
         <Card>
@@ -314,6 +320,7 @@ function VerifyAndResetModal({
 }) {
   const [pw, setPw] = useState('');
   const [notes, setNotes] = useState('Identity verified by Admin');
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -340,6 +347,7 @@ function VerifyAndResetModal({
           requestId: request.id,
           newPassword: pw,
           verificationNotes: notes,
+          code,
         }),
       });
       onSuccess({ name: request.full_name, email: request.email, password: pw });
@@ -384,9 +392,13 @@ function VerifyAndResetModal({
           </div>
         </Field>
 
+        <Field label="Your Microsoft Authenticator code" hint="Needed to set anyone's password.">
+          <CodeInput value={code} onChange={setCode} />
+        </Field>
+
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="light" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={handleFulfill} loading={busy} disabled={pw.length < 8}>
+          <Button onClick={handleFulfill} loading={busy} disabled={pw.length < 8 || !sixDigits(code)}>
             Confirm & Issue Password
           </Button>
         </div>
@@ -506,12 +518,13 @@ function UserModal({ roles, onClose, onSaved }: { roles: Role[]; onClose: () => 
 
 function PasswordModal({ user, onClose, onSaved }: { user: Staff; onClose: () => void; onSaved: () => void }) {
   const [pw, setPw] = useState('');
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const save = async () => {
     setBusy(true);
     try {
-      await api(`/api/staff/${user.id}`, { method: 'PATCH', body: JSON.stringify({ password: pw }) });
+      await api(`/api/staff/${user.id}`, { method: 'PATCH', body: JSON.stringify({ password: pw, code }) });
       onSaved();
     } catch (e: any) {
       setErr(e.message);
@@ -522,8 +535,11 @@ function PasswordModal({ user, onClose, onSaved }: { user: Staff; onClose: () =>
   return (
     <Modal open onClose={onClose} title={`New password for ${user.full_name}`}>
       <ErrorNote text={err} />
-      <Field label="New password" hint="At least 8 characters"><input type="password" className={inputCls} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
-      <div className="flex justify-end mt-4"><Button onClick={save} loading={busy} disabled={pw.length < 8}>Save</Button></div>
+      <div className="space-y-3">
+        <Field label="New password" hint="At least 8 characters"><input type="password" className={inputCls} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
+        <Field label="Your Microsoft Authenticator code" hint="Needed to change anyone's password."><CodeInput value={code} onChange={setCode} /></Field>
+      </div>
+      <div className="flex justify-end mt-4"><Button onClick={save} loading={busy} disabled={pw.length < 8 || !sixDigits(code)}>Save</Button></div>
     </Modal>
   );
 }

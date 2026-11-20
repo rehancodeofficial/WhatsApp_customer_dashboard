@@ -6,6 +6,7 @@ import { bizError } from '@/lib/biz/http';
 import { CustomerPatch, ENTITY_PERMS, OrderPatch, ProductPatch, SupplierPatch, zodMessage } from '@/lib/biz/schemas';
 import { onProductDeleted, watchInventory } from '@/lib/biz/inventory-sync';
 import { pushSupplier, removeSupplier } from '@/lib/biz/supplier-sync';
+import { logActivity } from '@/lib/security';
 
 type Ctx = { params: Promise<{ entity: string; id: string }> };
 
@@ -37,7 +38,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if ((p.data.status || p.data.notes !== undefined) && !can(v, 'orders.manage')) return NextResponse.json({ error: 'You do not have permission to change orders' }, { status: 403 });
     if (p.data.payment_status && !can(v, 'payments.manage') && !can(v, 'orders.manage')) return NextResponse.json({ error: 'You do not have permission to change payment status' }, { status: 403 });
     try {
-      return NextResponse.json({ order: await watchInventory('dashboard', () => getBizStore().updateOrder(id, p.data as any)) });
+      const order = await watchInventory('dashboard', () => getBizStore().updateOrder(id, p.data as any));
+      await logActivity(v, 'order.updated', { order_no: (order as any)?.order_no, ...p.data });
+      return NextResponse.json({ order });
     } catch (e) {
       return bizError(e);
     }
@@ -49,18 +52,23 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if (entity === 'customers') {
       const p = CustomerPatch.safeParse(body);
       if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
-      return NextResponse.json({ customer: await store.updateCustomer(id, p.data as any) });
+      const customer = await store.updateCustomer(id, p.data as any);
+      await logActivity(v, 'customer.updated', { name: (customer as any)?.name, fields: Object.keys(p.data) });
+      return NextResponse.json({ customer });
     }
     if (entity === 'suppliers') {
       const p = SupplierPatch.safeParse(body);
       if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
       const supplier = await store.saveSupplier(id, p.data as any);
       await pushSupplier(supplier);
+      await logActivity(v, 'supplier.updated', { code: supplier.code, fields: Object.keys(p.data) });
       return NextResponse.json({ supplier });
     }
     const p = ProductPatch.safeParse(body);
     if (!p.success) return NextResponse.json({ error: zodMessage(p.error) }, { status: 400 });
-    return NextResponse.json({ product: await watchInventory('dashboard', () => store.saveProduct(id, p.data as any)) });
+    const product = await watchInventory('dashboard', () => store.saveProduct(id, p.data as any));
+    await logActivity(v, 'inventory.product_updated', { id: product.sku, fields: Object.keys(p.data) });
+    return NextResponse.json({ product });
   } catch (e) {
     return bizError(e);
   }
@@ -76,10 +84,12 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
       const product = (await getBizStore().listProducts()).find((p) => p.id === id);
       await getBizStore().deleteProduct(id);
       if (product) await onProductDeleted(product);
+      await logActivity(v, 'inventory.product_deleted', { id: product?.sku, name: product ? `${product.brand} ${product.model}` : id });
     } else {
       const supplier = (await getBizStore().listSuppliers()).find((x) => x.id === id);
       await getBizStore().deleteSupplier(id);
       await removeSupplier(supplier?.code);
+      await logActivity(v, 'supplier.deleted', { code: supplier?.code, name: supplier?.name });
     }
     return NextResponse.json({ success: true });
   } catch (e) {

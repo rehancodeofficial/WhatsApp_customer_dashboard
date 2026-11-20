@@ -210,7 +210,8 @@ export async function fulfillPasswordResetRequest(
         .from('password_reset_requests')
         .update({
           status: 'completed',
-          temporary_password: newPassword,
+          // Never stored in plain text: the encrypted copy is in staff_secrets (Team & Access → Security).
+          temporary_password: null,
           verification_notes: updatedReq.verification_notes,
           reviewed_by: actorId,
           reviewed_at: now,

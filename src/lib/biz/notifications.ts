@@ -23,5 +23,6 @@ export const NOTIFICATION_TYPES: Record<string, { label: string; color: 'green' 
   payment: { label: 'Payment', color: 'green' },
   supplier: { label: 'Supplier', color: 'blue' },
   error: { label: 'Problem', color: 'red' },
+  security: { label: 'Security', color: 'red' },
   info: { label: 'Info', color: 'gray' },
 };

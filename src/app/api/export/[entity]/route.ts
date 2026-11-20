@@ -5,6 +5,7 @@ import type { Permission } from '@/lib/permissions';
 import { getBizStore } from '@/lib/biz/store';
 import { loadCustomerViews } from '@/lib/biz/service';
 import { bizError } from '@/lib/biz/http';
+import { logActivity } from '@/lib/security';
 
 type Col = { header: string; key: string; width?: number; money?: boolean; date?: boolean };
 type Sheet = { name: string; cols: Col[]; rows: Record<string, unknown>[] };
@@ -186,6 +187,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ ent
     }
     const buf = await wb.xlsx.writeBuffer();
     const stamp = new Date().toISOString().slice(0, 10);
+    await logActivity(v, 'export.downloaded', { entity: (await params).entity });
     return new NextResponse(buf as ArrayBuffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

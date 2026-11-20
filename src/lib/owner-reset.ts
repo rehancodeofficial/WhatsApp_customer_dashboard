@@ -4,6 +4,7 @@
 import { createHash, randomBytes } from 'crypto';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { callN8nBridge } from '@/lib/n8n-bridge';
+import { logActivity, recordPasswordChange } from '@/lib/security';
 
 export const RESET_MINUTES = 15;
 
@@ -67,6 +68,13 @@ export async function completeOwnerReset(token: string, password: string) {
   if (!claimed?.length) throw Object.assign(new Error('This reset link was already used.'), { status: 400 });
   const { error } = await db.auth.admin.updateUserById(row.user_id, { password });
   if (error) throw Object.assign(new Error('Could not set the new password: ' + error.message), { status: 400 });
+  // The email link proves it is the owner: also lifts a block after 3 wrong passwords.
+  await db.from('profiles').update({ failed_logins: 0, locked_at: null }).eq('id', row.user_id);
+  const { data: u } = await db.auth.admin.getUserById(row.user_id);
+  const { data: p } = await db.from('profiles').select('full_name, role').eq('id', row.user_id).maybeSingle();
+  const who = { id: row.user_id, name: p?.full_name || 'Admin', email: u.user?.email || '', role: p?.role || 'owner' };
+  await recordPasswordChange(who, password, { id: who.id, name: who.name, role: who.role }, 'reset the password with the email link');
+  await logActivity(who, 'password.reset_email', {});
   return { ok: true };
 }
 

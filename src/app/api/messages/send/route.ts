@@ -6,6 +6,7 @@ import { canSendRealWhatsApp, isDemoMode } from '@/lib/config';
 import { getRepo } from '@/lib/repo';
 import { agentMemoryText } from '@/lib/memory-format';
 import { rateLimit } from '@/lib/rate-limit';
+import { logActivity } from '@/lib/security';
 
 // The owner / agent replies to a customer from the dashboard.
 export async function POST(req: NextRequest) {
@@ -81,5 +82,6 @@ export async function POST(req: NextRequest) {
   // Put the human reply into the AI's memory so it knows what was said when it resumes.
   await repo.appendMemory(wa_id, 'ai', agentMemoryText(text));
 
+  await logActivity(viewer, 'chat.message_sent', { conversation_id, type, preview: String(text).slice(0, 120) });
   return NextResponse.json({ success: true, message });
 }

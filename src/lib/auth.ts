@@ -34,8 +34,9 @@ export async function getViewer(): Promise<SessionViewer | null> {
   // Two-factor on, but the 6-digit code not entered yet: not signed in.
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') return null;
-  const { data: profile } = await getAdminSupabase().from('profiles').select('role, role_id, full_name, active').eq('id', user.id).maybeSingle();
+  const { data: profile } = await getAdminSupabase().from('profiles').select('role, role_id, full_name, active, locked_at').eq('id', user.id).maybeSingle();
   if (!profile || profile.active === false) return null; // not staff, or deactivated by an Admin
+  if (profile.locked_at) return null; // blocked after 3 wrong passwords
   const role = profile.role === 'owner' ? 'owner' : 'agent';
   const r = role === 'owner' ? null : await getRole(profile.role_id);
   return {
