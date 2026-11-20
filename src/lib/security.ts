@@ -110,7 +110,7 @@ async function whatsappPassword(target: { id: string; name: string }, password: 
   if (!p?.whatsapp) return { sent: false, error: 'No WhatsApp number saved for this user' };
   const first = (target.name || '').split(' ')[0] || 'there';
   const text = setByAdmin
-    ? `Hi ${first}, your Phone Buzz Dashboard password was reset by the Admin.\n\nUsername: ${p.username || '-'}\nNew password: ${password}\n\nPlease sign in and change it in Settings → Profile. Do not share this message.`
+    ? `Hi ${first}, your Phone Buzz Dashboard password has been updated.\n\nUsername: ${p.username || '-'}\nNew password: ${password}\n\nAap ka password update ho gaya hai. Naya password upar hai.\n\nPlease sign in and change it in Settings → Profile. Do not share this message.`
     : `Hi ${first}, the password of your Phone Buzz Dashboard account (${p.username || '-'}) was just changed. If this was not you, tell the Admin right away.`;
   try {
     await sendMetaWhatsAppMessage({ to: p.whatsapp, type: 'text', text });

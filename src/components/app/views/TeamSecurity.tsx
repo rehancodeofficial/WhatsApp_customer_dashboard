@@ -3,13 +3,15 @@
 // Activity log (what every user did). Admin only. Viewing, setting or unblocking needs the Admin's
 // own Microsoft Authenticator code each time.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eye, EyeOff, KeyRound, Lock, LockOpen, RefreshCw, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, Lock, LockOpen, Pencil, RefreshCw, ShieldCheck, ShieldOff } from 'lucide-react';
 import { api, Button, Card, Chip, cx, dateTime, Empty, ErrorNote, Field, inputCls, Loading, Modal, SearchInput, Table, td } from '../ui';
 
 export interface SecUser {
   id: string;
   name: string;
   email: string;
+  username?: string | null;
+  whatsapp?: string | null;
   role: 'owner' | 'agent';
   roleLabel: string;
   status: 'active' | 'blocked' | 'deactivated';
@@ -70,11 +72,35 @@ export function SecurityTab() {
       {!users ? (
         <Loading />
       ) : (
-        <Table head={['Name', 'Email', 'Role', 'Status', '2FA', 'Password', 'Password changed', 'Last login', '']} minWidth={1100}>
+        <Table head={['Name', 'Username', 'Email', 'WhatsApp', 'Role', 'Status', '2FA', 'Password', 'Password changed', 'Last login', '']} minWidth={1380}>
           {users.map((u) => (
             <tr key={u.id} className={cx('hover:bg-slate-50/60', u.status === 'blocked' && 'bg-rose-50/40')}>
               <td className={cx(td, 'font-medium text-slate-800 whitespace-nowrap')}>{u.name}</td>
+              <td className={cx(td, 'font-mono text-xs text-slate-700 whitespace-nowrap')}>@{u.username || '—'}</td>
               <td className={cx(td, 'text-slate-600')}>{u.email}</td>
+              <td className={cx(td, 'whitespace-nowrap')}>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 text-xs text-slate-700 hover:text-orange-700"
+                  title="Change WhatsApp number (new passwords are sent here)"
+                  onClick={async () => {
+                    const w = window.prompt(`WhatsApp number for ${u.name}, with country code (new passwords are sent here):`, u.whatsapp || '');
+                    if (w === null || w.trim() === (u.whatsapp || '')) return;
+                    setErr(null);
+                    setOk(null);
+                    try {
+                      await api(`/api/staff/${u.id}`, { method: 'PATCH', body: JSON.stringify({ whatsapp: w.trim() || null }) });
+                      setOk(`WhatsApp number of ${u.name} saved.`);
+                      load();
+                    } catch (e: any) {
+                      setErr(e.message);
+                    }
+                  }}
+                >
+                  {u.whatsapp ? `+${u.whatsapp}` : <span className="text-orange-600 font-medium">Add number</span>}
+                  <Pencil className="w-3 h-3 text-slate-400" />
+                </button>
+              </td>
               <td className={td}>{u.roleLabel}</td>
               <td className={td}>
                 <Chip tone={STATUS[u.status].tone}>{STATUS[u.status].label}</Chip>

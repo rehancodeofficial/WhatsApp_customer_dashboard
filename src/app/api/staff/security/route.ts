@@ -23,6 +23,8 @@ export async function GET() {
         id: u.id,
         name: u.full_name,
         email: u.email,
+        username: u.username ?? null,
+        whatsapp: u.whatsapp ?? null,
         role: u.role,
         roleLabel: u.role === 'owner' ? 'Admin' : role?.name || 'Staff',
         status: !u.active ? 'deactivated' : p?.locked_at ? 'blocked' : 'active',
