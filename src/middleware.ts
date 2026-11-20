@@ -55,8 +55,22 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && pathname !== '/login') return redirectToLogin();
-  if (user && pathname === '/login') return redirectToDashboard();
+  const open = pathname === '/login' || pathname === '/reset-password';
+  if (!user && !open) return redirectToLogin();
+  if (user) {
+    // Two-factor on but the code not entered yet: only the login page (code step) is reachable.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const needsCode = aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2';
+    if (needsCode) {
+      if (open) return response;
+      if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Enter your two-factor code' }, { status: 401 });
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.search = '?mfa=1';
+      return NextResponse.redirect(url);
+    }
+    if (pathname === '/login') return redirectToDashboard();
+  }
   return response;
 }
 

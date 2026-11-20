@@ -35,5 +35,8 @@ export async function POST(req: NextRequest) {
     await supabase.auth.signOut();
     return NextResponse.json({ error: 'This account has no dashboard access. Ask an Admin.' }, { status: 403 });
   }
+  // Two-factor on: the password was right, now the app code is needed (login step 2).
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') return NextResponse.json({ success: true, mfa_required: true });
   return NextResponse.json({ success: true, role: profile.role });
 }

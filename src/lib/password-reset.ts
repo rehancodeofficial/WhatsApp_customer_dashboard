@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { isDemoMode } from '@/lib/config';
 import { getAdminSupabase } from '@/lib/supabase/admin';
 import { listStaff, updateStaff, StaffError } from '@/lib/staff';
+import { findOwnerByEmail, maskEmail, RESET_MINUTES, sendOwnerResetLink } from '@/lib/owner-reset';
 
 export interface PasswordResetRequest {
   id: string;
@@ -29,12 +30,28 @@ function getMemoryStore(): PasswordResetRequest[] {
   return g.__pbResetRequests;
 }
 
-export async function requestPasswordReset(emailInput: string, reason?: string): Promise<{
+export async function requestPasswordReset(emailInput: string, reason?: string, origin = ''): Promise<{
   type: 'admin_email_sent' | 'staff_request_submitted';
   message: string;
   email: string;
 }> {
   const email = emailInput.trim().toLowerCase();
+
+  // Owner: a one-time link (15 minutes) goes to the recovery email (Outlook). Matches the login or the recovery email.
+  if (!isDemoMode()) {
+    const owner = await findOwnerByEmail(email);
+    if (owner) {
+      const sent = await sendOwnerResetLink(owner, origin).catch((e) => {
+        throw new StaffError(e?.message || 'Could not send the reset email.', 502);
+      });
+      return {
+        type: 'admin_email_sent',
+        message: `A reset link was sent to ${maskEmail(sent.sentTo)}. It works once and expires in ${RESET_MINUTES} minutes.`,
+        email: maskEmail(sent.sentTo),
+      };
+    }
+  }
+
   const staffList = await listStaff();
   const user = staffList.find((u) => u.email.toLowerCase() === email);
 
@@ -52,21 +69,8 @@ export async function requestPasswordReset(emailInput: string, reason?: string):
       };
     }
 
-    const sb = getAdminSupabase();
-    // Use Supabase Auth password reset link / email
-    const { error } = await sb.auth.resetPasswordForEmail(user.email, {
-      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : undefined,
-    });
-
-    if (error) {
-      throw new StaffError(`Failed to send reset email: ${error.message}`, 500);
-    }
-
-    return {
-      type: 'admin_email_sent',
-      message: 'A password recovery link has been sent directly to your registered Admin email address.',
-      email: user.email,
-    };
+    // Live mode never gets here: the owner is handled above.
+    throw new StaffError('Password reset for the Admin is not available.', 500);
   }
 
   // 2. If user is Staff / non-admin ('agent'), create a reset request for Admin review

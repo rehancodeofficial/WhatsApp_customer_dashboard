@@ -127,3 +127,13 @@ describe('demo store: orders and stock stay consistent', () => {
     await expect(store.createOrder({ contact_id: null, items: [{ product_id: p.id, description: 'x', quantity: before + 1, unit_price: 1 }] })).rejects.toThrow(/Not enough stock/);
   });
 });
+
+import { offerVariable } from '@/lib/biz/service';
+describe('broadcast offer as a template variable', () => {
+  it('has no new lines, tabs or long space runs and stays short', () => {
+    const v = offerVariable('Hi Ali,\n\nNew offer:\n• iPhone 15\t256GB     USD 700\r\n');
+    expect(v).not.toMatch(/[\n\t]| {5,}/);
+    expect(v).toBe('Hi Ali, · New offer: · • iPhone 15 256GB USD 700');
+    expect(offerVariable('x'.repeat(2000)).length).toBe(850);
+  });
+});

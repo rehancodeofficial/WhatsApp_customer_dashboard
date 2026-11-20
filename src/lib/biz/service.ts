@@ -41,17 +41,38 @@ export interface SendBroadcastInput {
  * if Meta says the template takes no (or other) variables, it is sent again without them
  * (e.g. the account's "phonebuzz_intro" template has no variables).
  */
-async function sendTemplate(to: string, name: string, lang: string, params: string[]) {
+async function sendTemplate(to: string, name: string, lang: string, params: string[]): Promise<{ waMessageId: string; rawResponse: any; usedTemplate: string }> {
   try {
-    return await sendMetaWhatsAppMessage({ to, type: 'template', templateName: name, templateLanguage: lang, templateParams: params });
+    return { ...(await sendMetaWhatsAppMessage({ to, type: 'template', templateName: name, templateLanguage: lang, templateParams: params })), usedTemplate: name };
   } catch (e: any) {
     const code = String(e?.code ?? e?.raw?.error?.code ?? '');
     const msg = String(e?.message || '');
+    // Template not approved / not found (yet): fall back to the approved intro template.
+    if ((code === '132001' || /does not exist|not found/i.test(msg)) && name !== FALLBACK_TEMPLATE) {
+      return { ...(await sendMetaWhatsAppMessage({ to, type: 'template', templateName: FALLBACK_TEMPLATE, templateLanguage: 'en' })), usedTemplate: FALLBACK_TEMPLATE };
+    }
     if (code === '132000' || code === '100' || /parameter/i.test(msg)) {
-      return await sendMetaWhatsAppMessage({ to, type: 'template', templateName: name, templateLanguage: lang });
+      return { ...(await sendMetaWhatsAppMessage({ to, type: 'template', templateName: name, templateLanguage: lang })), usedTemplate: name };
     }
     throw e;
   }
+}
+
+/** Approved in the Meta account, no variables (generic intro). */
+const FALLBACK_TEMPLATE = 'phonebuzz_intro';
+
+/**
+ * The broadcast text as one template variable: WhatsApp does not allow new lines, tabs or more than
+ * 4 spaces in a row inside a variable, and the whole template body must stay under 1024 characters.
+ */
+export function offerVariable(text: string) {
+  return text
+    .trim()
+    .replace(/(\r?\n)+/g, ' · ')
+    .replace(/\t/g, ' ')
+    .replace(/ {2,}/g, ' ')
+    .trim()
+    .slice(0, 850);
 }
 
 export async function sendBroadcast(input: SendBroadcastInput): Promise<Broadcast> {
@@ -97,15 +118,18 @@ export async function sendBroadcast(input: SendBroadcastInput): Promise<Broadcas
         throw new Error('Last message older than 24 h: WhatsApp needs an approved template');
       }
       let waId: string;
+      let usedTemplate = input.template_name || '';
       if (live) {
         const res = useTemplate
-          ? await sendTemplate(c.wa_id, input.template_name!, input.template_language || 'en', [(c.name || c.profile_name || 'there').split(' ')[0], productText])
+          ? await sendTemplate(c.wa_id, input.template_name!, input.template_language || 'en', [(c.name || c.profile_name || 'there').split(' ')[0], offerVariable(body) || productText])
           : await sendMetaWhatsAppMessage({ to: c.wa_id, type: 'text', text: body });
         waId = res.waMessageId;
+        if ('usedTemplate' in res) usedTemplate = String(res.usedTemplate);
       } else {
         waId = `wamid.demo_broadcast_${broadcast.id.slice(0, 8)}_${sent + failed}`;
       }
-      const shown = useTemplate ? `[Template: ${input.template_name}] ${productText}` : body;
+      // Offer template: the customer got the dashboard text. Intro fallback: only the generic intro.
+      const shown = !useTemplate ? body : usedTemplate === FALLBACK_TEMPLATE ? `[Template: ${FALLBACK_TEMPLATE}] (intro only, offer not included)` : `[Template: ${usedTemplate}] ${body}`;
       await store.updateRecipient(r.id, { status: 'sent', wa_message_id: waId, sent_at: new Date().toISOString() });
       sent++;
       // Show it in the customer's chat (created if needed) and give the AI the context. Never fail the broadcast for this.

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Loader2, Eye, EyeOff, KeyRound, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff, KeyRound, ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 const DEMO = [
   { label: 'Admin (full access)', email: 'admin@phonebuzz.demo', password: 'Admin@123' },
@@ -23,6 +23,9 @@ function LoginForm() {
   const [setupError, setSetupError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [reason, setReason] = useState('');
+  // Two-factor step: after a correct password when Microsoft Authenticator is on (or ?mfa=1 from the middleware).
+  const [mfa, setMfa] = useState(params.get('mfa') === '1');
+  const [code, setCode] = useState('');
 
   useEffect(() => {
     fetch('/api/health')
@@ -75,11 +78,45 @@ function LoginForm() {
         setError(data.error || 'Sign-in failed');
         return;
       }
-      const next = params.get('next');
-      window.location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+      if (data.mfa_required) {
+        setMfa(true);
+        return;
+      }
+      goNext();
     } finally {
       setBusy(false);
     }
+  };
+
+  const goNext = () => {
+    const next = params.get('next');
+    window.location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+  };
+
+  const verifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/mfa/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Wrong code');
+        if (res.status === 401 && /expired/i.test(data.error || '')) setMfa(false);
+        return;
+      }
+      goNext();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelMfa = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    setMfa(false);
+    setCode('');
+    setPassword('');
+    setError(null);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -212,6 +249,48 @@ function LoginForm() {
           </form>
         )}
       </div>
+    );
+  }
+
+  if (mfa) {
+    return (
+      <form onSubmit={verifyCode} className="space-y-4">
+        <div className="flex items-start gap-3 rounded-xl bg-orange-50 border border-orange-200 p-3">
+          <ShieldCheck className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-slate-700">
+            Two-factor sign-in is on. Open <b>Microsoft Authenticator</b> on your phone and enter the 6-digit code for <b>Phone Buzz Dashboard</b>.
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="code">
+            Authenticator code
+          </label>
+          <input
+            id="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            maxLength={7}
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/[^0-9 ]/g, ''))}
+            placeholder="123 456"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-lg tracking-[0.4em] text-center font-mono focus:outline-none focus:ring-2 focus:ring-orange-500"
+          />
+        </div>
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={busy || code.replace(/\s/g, '').length !== 6}
+          className="w-full rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold py-2.5 flex items-center justify-center gap-2 disabled:opacity-60"
+        >
+          {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+          Verify and sign in
+        </button>
+        <button type="button" onClick={cancelMfa} className="w-full text-xs text-slate-500 hover:text-slate-700">
+          Use a different account
+        </button>
+      </form>
     );
   }
 

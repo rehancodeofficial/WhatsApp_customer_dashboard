@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await requestPasswordReset(parsed.data.email, parsed.data.reason);
+    const result = await requestPasswordReset(parsed.data.email, parsed.data.reason, req.nextUrl.origin);
     return NextResponse.json(result);
   } catch (err: any) {
     const status = typeof err.status === 'number' ? err.status : 400;

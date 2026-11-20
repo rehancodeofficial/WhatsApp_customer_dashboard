@@ -19,8 +19,9 @@ export async function GET() {
         .filter((p) => p.active && p.stock_qty > 0)
         .map((p) => ({ id: p.id, brand: p.brand, model: p.model, variant: p.variant, condition: p.condition, sale_price: p.sale_price, currency: p.currency, stock_qty: p.stock_qty })),
       aiConfigured: !!process.env.CLAUDE_API_KEY,
-      // Approved in the Meta account (the n8n outreach uses it too); has no variables.
-      defaultTemplate: process.env.WHATSAPP_BROADCAST_TEMPLATE || 'phonebuzz_intro',
+      // "phonebuzz_offer" carries the dashboard text ({{1}} first name, {{2}} offer). Until Meta approves it,
+      // sending falls back to the approved "phonebuzz_intro" (no variables).
+      defaultTemplate: process.env.WHATSAPP_BROADCAST_TEMPLATE || 'phonebuzz_offer',
       defaultTemplateLanguage: process.env.WHATSAPP_BROADCAST_TEMPLATE_LANG || 'en',
     });
   } catch (e) {
