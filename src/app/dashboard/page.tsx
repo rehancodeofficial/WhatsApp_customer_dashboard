@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, LogOut } from 'lucide-react';
+import { Button, Modal } from '@/components/app/ui';
 import type { AIModeEvent, Conversation, Message } from '@/lib/types';
 import { AppShell, allowedSections, type Section } from '@/components/app/AppShell';
 import { OverviewView } from '@/components/app/views/OverviewView';
@@ -52,6 +53,25 @@ export default function DashboardPage() {
   const [modeEvents, setModeEvents] = useState<AIModeEvent[]>([]);
   const [panelOpen, setPanelOpen] = useState(true);
   const [openNotification, setOpenNotification] = useState<NotificationRow | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Prevent accidental back navigation from reopening login or exiting silently.
+  // When user clicks the browser Back button, intercept it and show the in-app Logout confirmation modal.
+  useEffect(() => {
+    // Push an initial entry so there is an entry to intercept
+    window.history.pushState({ dashboard: true }, '');
+
+    const handlePopState = () => {
+      // Re-push state so URL doesn't navigate away unexpectedly
+      window.history.pushState({ dashboard: true }, '');
+      setShowLogoutConfirm(true);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedId;
@@ -273,6 +293,23 @@ export default function DashboardPage() {
         onOpenChat={canChats ? openChat : undefined}
         onOpenOrders={perms.has('orders.view') ? () => { setOpenNotification(null); setSection('orders'); } : undefined}
       />
+      {showLogoutConfirm && (
+        <Modal open onClose={() => setShowLogoutConfirm(false)} title="Sign out confirmation">
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              You clicked Back in your browser. Do you want to sign out of your account, or stay on the dashboard?
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button variant="light" onClick={() => setShowLogoutConfirm(false)}>
+                Stay on dashboard
+              </Button>
+              <Button variant="danger" onClick={signOut}>
+                <LogOut className="w-4 h-4" /> Sign out
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
