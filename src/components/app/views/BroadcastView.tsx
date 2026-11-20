@@ -134,11 +134,26 @@ export function BroadcastView() {
     }
   };
 
+  const maxAvailableStock = useMemo(() => {
+    const picked = products.filter((p) => productIds.includes(p.id));
+    if (!picked.length) return 0;
+    return picked.reduce((acc, p) => acc + (p.stock_qty || 0), 0);
+  }, [products, productIds]);
+
   const updateStock = (val: string) => {
-    setOfferStock(val);
+    if (val === '') {
+      setOfferStock('');
+      const picked = products.filter((p) => productIds.includes(p.id));
+      if (picked.length) setMessage(buildMessage(picked, offerPrice, '', countries));
+      return;
+    }
+    const numVal = parseInt(val, 10);
+    const validVal = isNaN(numVal) ? 0 : Math.max(0, maxAvailableStock > 0 ? Math.min(numVal, maxAvailableStock) : numVal);
+    const validStr = String(validVal);
+    setOfferStock(validStr);
     const picked = products.filter((p) => productIds.includes(p.id));
     if (picked.length) {
-      setMessage(buildMessage(picked, offerPrice, val, countries));
+      setMessage(buildMessage(picked, offerPrice, validStr, countries));
     }
   };
 
@@ -296,13 +311,18 @@ export function BroadcastView() {
                     placeholder="e.g. 750"
                   />
                 </Field>
-                <Field label="Offer stock (units)">
+                <Field
+                  label="Offer stock (units)"
+                  hint={maxAvailableStock > 0 ? `Max available: ${maxAvailableStock} units` : undefined}
+                >
                   <input
                     type="number"
+                    min={1}
+                    max={maxAvailableStock > 0 ? maxAvailableStock : undefined}
                     className={inputCls}
                     value={offerStock}
                     onChange={(e) => updateStock(e.target.value)}
-                    placeholder="e.g. 50"
+                    placeholder={maxAvailableStock > 0 ? `Max ${maxAvailableStock}` : 'e.g. 50'}
                   />
                 </Field>
               </div>
