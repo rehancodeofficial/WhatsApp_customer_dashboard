@@ -14,7 +14,6 @@
     "import-sheet-db": "tsx --env-file=.env.local scripts/import-sheet-db.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.10.0",
     "@electric-sql/pglite": "^0.3.14",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.1",

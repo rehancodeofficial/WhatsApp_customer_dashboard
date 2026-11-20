@@ -167,8 +167,8 @@ export function BroadcastView() {
               title="AI suggestions"
               subtitle={
                 defaults.ai
-                  ? 'Claude reviews stock, sales pace, margins and customer demand, then writes the offer.'
-                  : 'Picks from stock, sales pace, margins and customer demand. Add CLAUDE_API_KEY to let Claude write the copy.'
+                  ? 'Gemini reviews stock, sales pace, margins and customer demand, then writes the offer.'
+                  : 'Picks from stock, sales pace, margins and customer demand. Add GEMINI_API_KEY to let Gemini write the copy.'
               }
               right={
                 <Button variant="brand" onClick={getSuggestions} loading={suggLoading}>
@@ -184,7 +184,7 @@ export function BroadcastView() {
                   <div key={s.product_id} className={cx('rounded-3xl p-4 flex flex-col', i === 0 ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200/70')}>
                     <div className="flex items-center justify-between gap-2">
                       <span className={cx('text-[11px] font-semibold uppercase tracking-wide', i === 0 ? 'text-orange-300' : 'text-orange-600')}>{i === 0 ? 'Top pick' : `Pick ${i + 1}`}</span>
-                      <span className={cx('text-[11px]', i === 0 ? 'text-slate-300' : 'text-slate-500')}>{sugg.source === 'claude' ? 'by Claude' : 'rules'}</span>
+                      <span className={cx('text-[11px]', i === 0 ? 'text-slate-300' : 'text-slate-500')}>{sugg.source === 'gemini' ? '✦ by Gemini' : 'rules'}</span>
                     </div>
                     <div className="font-semibold mt-1.5 leading-snug">{s.product}</div>
                     <div className={cx('text-xs mt-1', i === 0 ? 'text-slate-300' : 'text-slate-500')}>
