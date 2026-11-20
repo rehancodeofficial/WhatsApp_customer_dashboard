@@ -104,7 +104,7 @@ export function BroadcastView() {
           `\n\nReply with the model and quantity to book.`
       );
     }
-    if (!brands.length && picked.length) setBrands(Array.from(new Set(picked.map((p) => p.brand))));
+    // Picking a product does not filter the customers: everyone stays selected unless you set a filter below.
   };
 
   const recipients = (audience || []).filter((a) => !excluded.has(a.id));
@@ -252,9 +252,9 @@ export function BroadcastView() {
               </Field>
               <Field
                 label="Approved WhatsApp template (for customers outside the 24 h window)"
-                hint="WhatsApp only allows free text within 24 h of the customer's last message. Others get this template with {{1}} = first name, {{2}} = the product line(s)."
+                hint="WhatsApp only allows free text within 24 h of the customer's last message. Others get this template with {{1}} = first name, {{2}} = your message above. Until Meta approves phonebuzz_offer, they get the phonebuzz_intro template instead."
               >
-                <input className={inputCls} value={template} onChange={(e) => setTemplate(e.target.value)} placeholder="e.g. product_offer" />
+                <input className={inputCls} value={template} onChange={(e) => setTemplate(e.target.value)} placeholder="phonebuzz_offer" />
               </Field>
             </div>
           </Card>
@@ -280,7 +280,21 @@ export function BroadcastView() {
                 {!audience ? (
                   <Loading />
                 ) : !audience.length ? (
-                  <Empty title="No customers match these filters" />
+                  <div className="text-center py-6">
+                    <Empty title="No customers match these filters" />
+                    {(countries.length > 0 || tiers.length > 0 || brands.length > 0) && (
+                      <button
+                        className="mt-2 text-sm font-semibold text-orange-600 hover:text-orange-700"
+                        onClick={() => {
+                          setCountries([]);
+                          setTiers([]);
+                          setBrands([]);
+                        }}
+                      >
+                        Clear filters (send to all customers)
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   audience.filter((a) => !rq || `${a.name} ${a.wa_id} ${a.country} ${a.brands.join(' ')}`.toLowerCase().includes(rq.toLowerCase())).map((a) => {
                     const on = !excluded.has(a.id);
@@ -321,6 +335,11 @@ export function BroadcastView() {
               {closedWindow > 0 && (
                 <p className={cx('text-xs mt-2', template ? 'text-slate-500' : 'text-amber-700')}>
                   {closedWindow} of them last wrote more than 24 h ago{template ? ` and get the "${template}" template.` : '. Add an approved template, or they will be skipped.'}
+                </p>
+              )}
+              {(!recipients.length || message.trim().length < 5 || !title.trim()) && (
+                <p className="text-xs text-amber-700 mt-2">
+                  {!recipients.length ? 'Select at least one customer (clear the filters if the list is empty).' : !title.trim() ? 'Add a title.' : 'Write the message (at least 5 characters).'}
                 </p>
               )}
               <Button className="w-full mt-4" variant="brand" disabled={!recipients.length || message.trim().length < 5 || !title.trim()} onClick={() => setConfirming(true)}>
