@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { checkN8nSecret } from '@/lib/config';
 import { getRepo } from '@/lib/repo';
+import { emailKey } from '@/lib/biz/channel';
 
 // Replaces the Customer_Chats / Supplier_Chats Google Sheets.
 // n8n posts the output of its "Chat Rows" (customers) or "Supplier Chat Rows" (suppliers) node:
@@ -26,18 +27,23 @@ export async function POST(req: NextRequest) {
   for (const r of rows) {
     try {
       const channel = str(r.Channel).toLowerCase();
-      const wa = digits(party === 'supplier' ? r.WhatsApp_Number : r.Contact || r.WhatsApp_Number);
+      const rawWa = party === 'supplier' ? r.WhatsApp_Number : r.Contact || r.WhatsApp_Number;
+      let wa = digits(rawWa);
+      const email = str(r.Email || (String(rawWa).includes('@') ? rawWa : ''));
+      if (channel === 'email' || (!wa && email)) {
+        wa = emailKey(email || 'unknown@customer.com');
+      }
       const text = str(r.Message);
       if (!text) { results.push({ ok: true, skipped: 'empty' }); continue; }
-      if (channel === 'email' || wa.length < 6) { results.push({ ok: true, skipped: 'not a WhatsApp chat' }); continue; }
+      if (channel !== 'email' && wa.length < 6) { results.push({ ok: true, skipped: 'not a valid WhatsApp or email chat' }); continue; }
       const from = str(r.From);
       const name = str(party === 'supplier' ? r.Supplier_Name : r.Customer_Name) || null;
       // Stable id per message, so n8n retries never create duplicates.
       const id = 'n8n_' + createHash('sha1').update([party, wa, from, text, str(r.Execution_ID) || str(r.Date_Time)].join('|')).digest('hex').slice(0, 32);
-      const raw = { source: 'n8n-chat-log', message_type: r.Message_Type || null, request_id: r.Request_ID || null, lead_id: r.Customer_ID || null, n8n_status: r.Status || null };
+      const raw = { source: 'n8n-chat-log', channel: channel === 'email' ? 'email' : 'whatsapp', message_type: r.Message_Type || null, request_id: r.Request_ID || null, lead_id: r.Customer_ID || null, n8n_status: r.Status || null };
       const incoming = /^(customer|supplier)/i.test(from);
       if (incoming) {
-        if (party === 'customer' && from === 'Customer') { results.push({ ok: true, skipped: 'saved by /api/n8n/inbound' }); continue; }
+        if (party === 'customer' && from === 'Customer' && channel !== 'email') { results.push({ ok: true, skipped: 'saved by /api/n8n/inbound' }); continue; }
         await repo.ingestInbound({ wa_id: wa, party, wa_message_id: id, name, type: 'text', body: text, raw });
       } else {
         await repo.logOutbound({
@@ -47,7 +53,7 @@ export async function POST(req: NextRequest) {
           wa_message_id: id,
           type: /template/i.test(str(r.Message_Type)) ? 'template' : 'text',
           body: text,
-          sender_type: /owner/i.test(from) ? 'agent' : 'ai',
+          sender_type: /owner|salesman/i.test(from) ? 'agent' : 'ai',
           status: /^failed/i.test(str(r.Status)) ? 'failed' : 'sent',
           raw,
         });

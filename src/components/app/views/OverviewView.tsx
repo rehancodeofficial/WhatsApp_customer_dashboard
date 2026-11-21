@@ -144,27 +144,32 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
 
           {/* 2. Gross profit & Pending Payments (Stacked into 2 cards in height-wise, same width) */}
           <div className="xl:col-span-3 flex flex-col gap-3 min-h-[170px] justify-between">
-            {/* 2A. Gross profit Card (Orange Highlight) */}
+            {/* 2A. Gross profit & Bargaining Loss Card (Orange Highlight) */}
             <div className="flex-1 bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 text-white flex flex-col justify-between shadow-md shadow-orange-500/20">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-orange-100">Gross profit</span>
-                <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
-                  <TrendingUp className="w-3 h-3 text-white" />
-                </span>
-              </div>
-              <div className="flex items-baseline justify-between mt-1">
-                <div className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                  {money(s.profit, undefined, true)}
+              <div className="grid grid-cols-2 gap-2 divide-x divide-white/20">
+                <div className="pr-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-orange-100">Gross profit</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-bold tracking-tight text-white mt-0.5">
+                    {money(s.profit, undefined, true)}
+                  </div>
                 </div>
-                <div className="text-[10px] text-orange-100/90 flex flex-col items-end">
-                  {s.totalDiscount > 0 ? (
-                    <span className="font-semibold text-orange-200">
-                      -{money(s.totalDiscount, undefined, true)} disc
+                <div className="pl-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-orange-200">Loss (Bargained)</span>
+                    <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                      <TrendingUp className="w-2.5 h-2.5 text-white" />
                     </span>
-                  ) : (
-                    <span>this period</span>
-                  )}
+                  </div>
+                  <div className="text-lg sm:text-xl font-bold tracking-tight text-orange-100 mt-0.5">
+                    {money(s.totalDiscount || 0, undefined, true)}
+                  </div>
                 </div>
+              </div>
+              <div className="text-[10px] text-orange-100/90 flex items-center justify-between mt-2 pt-1 border-t border-white/15">
+                <span>Net after bargaining</span>
+                <span className="font-semibold">{s.totalDiscount > 0 ? `-${money(s.totalDiscount, undefined, true)} discounted` : 'this period'}</span>
               </div>
             </div>
 

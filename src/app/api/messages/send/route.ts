@@ -7,12 +7,14 @@ import { getRepo } from '@/lib/repo';
 import { agentMemoryText } from '@/lib/memory-format';
 import { rateLimit } from '@/lib/rate-limit';
 import { logActivity } from '@/lib/security';
-import { translateForCustomer } from '@/lib/n8n-bridge';
+import { callN8nBridge, translateForCustomer } from '@/lib/n8n-bridge';
+import { isEmailOnly } from '@/lib/biz/channel';
+import { getBusinessOwnerEmail } from '@/lib/owner-email';
 
-// Translation (n8n Gemini) + WhatsApp send can take a few seconds.
+// Translation (n8n Gemini) + WhatsApp / Email send can take a few seconds.
 export const maxDuration = 60;
 
-// The owner / agent replies to a customer from the dashboard.
+// The owner / agent replies to a customer or supplier from the dashboard.
 export async function POST(req: NextRequest) {
   const viewer = await requireViewer('chats.reply');
   if (viewer instanceof NextResponse) return viewer;
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
-  const { conversation_id, type, body, template_name, template_language } = parsed.data;
+  const { conversation_id, type, body, template_name, template_language, subject } = parsed.data;
   if (type === 'text' && !body?.trim()) return NextResponse.json({ error: 'Message is empty' }, { status: 400 });
   if (type === 'template' && !template_name) return NextResponse.json({ error: 'Template name is required' }, { status: 400 });
 
@@ -35,16 +37,20 @@ export async function POST(req: NextRequest) {
   if (conv.mode === 'ai') {
     return NextResponse.json({ error: 'AI is responding in this chat. Switch to Human Responding first.' }, { status: 409 });
   }
-  const wa_id = conv.contact?.wa_id;
-  if (!wa_id) return NextResponse.json({ error: 'Customer phone number missing' }, { status: 400 });
 
-  // Meta 24-hour rule: free text only within 24h of the customer's last message.
-  const windowStatus = get24HourWindowStatus(conv.last_customer_message_at);
-  if (!windowStatus.isOpen && type !== 'template') {
-    return NextResponse.json(
-      { error: '24-hour window is closed (Meta error 131047). Send an approved template instead.', code: 131047 },
-      { status: 403 }
-    );
+  const isEmail = conv.channel === 'email' || isEmailOnly(conv.contact?.wa_id);
+  const wa_id = conv.contact?.wa_id;
+  if (!wa_id && !conv.contact?.email) return NextResponse.json({ error: 'Customer contact info missing' }, { status: 400 });
+
+  // Meta 24-hour rule only applies to WhatsApp free text
+  if (!isEmail) {
+    const windowStatus = get24HourWindowStatus(conv.last_customer_message_at);
+    if (!windowStatus.isOpen && type !== 'template') {
+      return NextResponse.json(
+        { error: '24-hour window is closed (Meta error 131047). Send an approved template instead.', code: 131047 },
+        { status: 403 }
+      );
+    }
   }
 
   // Owner writes in his language; the customer gets it in theirs (n8n Gemini).
@@ -63,10 +69,35 @@ export async function POST(req: NextRequest) {
 
   let waMessageId: string;
   let raw: Record<string, unknown> = {};
-  if (canSendRealWhatsApp()) {
+
+  if (isEmail) {
+    const recipientEmail = conv.contact?.email || (wa_id ? wa_id.replace(/^email:/i, '') : '');
+    const ownerEmail = await getBusinessOwnerEmail();
+    const emailSubject = subject?.trim() || 'Re: PhoneBuzz Inquiry';
+
+    try {
+      if (!isDemoMode()) {
+        const bridgeRes = await callN8nBridge('send_email', {
+          to: recipientEmail,
+          from: ownerEmail,
+          subject: emailSubject,
+          html: `<p style="white-space: pre-wrap; font-family: sans-serif; font-size: 14px;">${outText}</p>`,
+          text: outText,
+          reply_to: ownerEmail,
+        });
+        waMessageId = `email_${bridgeRes?.id || Date.now()}`;
+        raw = { bridgeRes, from: ownerEmail, to: recipientEmail, subject: emailSubject };
+      } else {
+        waMessageId = `email.demo_out_${Date.now()}`;
+        raw = { demo: true, from: ownerEmail, to: recipientEmail, subject: emailSubject };
+      }
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message || 'Email send failed' }, { status: 502 });
+    }
+  } else if (canSendRealWhatsApp()) {
     try {
       const res = await sendMetaWhatsAppMessage({
-        to: wa_id,
+        to: wa_id!,
         type,
         text: outText || undefined,
         templateName: template_name || undefined,
@@ -92,20 +123,25 @@ export async function POST(req: NextRequest) {
 
   const text = type === 'template' ? `[Template: ${template_name}]` : outText;
   if (translation?.translated) raw = { ...raw, original_text: body!.trim(), translated_to: translation.language };
+  const party = (conv.contact?.kind === 'supplier' ? 'supplier' : 'customer') as 'customer' | 'supplier';
   const message = await repo.logOutbound({
-    wa_id,
+    wa_id: wa_id || `email:${conv.contact?.email}`,
+    party,
+    name: conv.contact?.name,
     wa_message_id: waMessageId,
     type,
     body: text,
     sender_type: 'agent',
     sender_user_id: viewer.id,
     status: 'sent',
-    raw,
+    raw: { ...raw, channel: isEmail ? 'email' : 'whatsapp' },
   });
 
   // Put the human reply into the AI's memory so it knows what was said when it resumes.
-  await repo.appendMemory(wa_id, 'ai', agentMemoryText(text));
+  if (wa_id) {
+    await repo.appendMemory(wa_id, 'ai', agentMemoryText(text));
+  }
 
-  await logActivity(viewer, 'chat.message_sent', { conversation_id, type, preview: String(text).slice(0, 120) });
+  await logActivity(viewer, 'chat.message_sent', { conversation_id, type, channel: isEmail ? 'email' : 'whatsapp', preview: String(text).slice(0, 120) });
   return NextResponse.json({ success: true, message, translation });
 }

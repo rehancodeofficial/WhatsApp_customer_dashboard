@@ -19,7 +19,7 @@ export const PERMISSION_GROUPS = [
       { key: 'chats.view', label: 'Customer chats', hint: 'Read customer ↔ AI WhatsApp chats' },
       { key: 'supplier_chats.view', label: 'Supplier chats', hint: 'Read supplier ↔ AI WhatsApp chats' },
       { key: 'chats.organize', label: 'Organize chats', hint: 'Star and archive chats' },
-      { key: 'chats.actions', label: 'Verify Payment, Delivered & Pause AI', hint: 'Verify payment, order delivered, and pause/resume AI' },
+      { key: 'chats.actions', label: 'Verify Payment, Delivered, Pause AI & Reply', hint: 'Verify payment, order delivered, pause/resume AI, and manual replies (WhatsApp & Email)' },
     ],
   },
   {
@@ -90,7 +90,7 @@ export function sanitizePermissions(list: readonly string[] | null | undefined):
 export function can(access: Access | null | undefined, p: Permission): boolean {
   if (!access) return false;
   if (access.role === 'owner') return true;
-  if (p === 'ai.toggle' && sanitizePermissions(access.permissions).includes('chats.actions')) return true;
+  if ((p === 'ai.toggle' || p === 'chats.reply') && sanitizePermissions(access.permissions).includes('chats.actions')) return true;
   if ((ADMIN_ONLY_PERMISSIONS as string[]).includes(p)) return false;
   return sanitizePermissions(access.permissions).includes(p as GrantablePermission);
 }

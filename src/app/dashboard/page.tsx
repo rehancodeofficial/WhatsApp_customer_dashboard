@@ -319,27 +319,34 @@ export default function DashboardPage() {
               isPanelOpen={panelOpen}
               onTogglePanel={chatParty === 'customer' ? () => setPanelOpen(!panelOpen) : undefined}
             />
-            <UnifiedMessageList messages={messages} events={modeEvents} currentMode={selected.mode} party={chatParty} />
-            {perms.has('chats.reply') && selected.channel !== 'email' && selected.mode === 'ai' ? (
+            <UnifiedMessageList messages={messages} events={modeEvents} currentMode={selected.mode} party={chatParty} channel={selected.channel} />
+            {perms.has('chats.reply') && selected.mode === 'ai' ? (
               // While the AI is responding the reply box is off: switch to Human Responding first.
               <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex-1 min-w-[12rem] rounded-full border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-400 cursor-not-allowed select-none">
                   AI is responding. Switch to Human Responding (top right) to reply.
                 </div>
               </div>
-            ) : perms.has('chats.reply') && selected.channel !== 'email' ? (
-              // The owner replies here: translated to the customer's language, sent from the business
-              // number, and the chat goes to "human" (AI paused) until he presses Resume AI.
+            ) : perms.has('chats.reply') ? (
+              // The owner / salesman replies here: translated to the customer's language, sent from the business
+              // number or email, and the chat goes to "human" (AI paused) until resumed.
               <UnifiedMessageComposer
                 key={selected.id}
                 conversationId={selected.id}
-                channel="whatsapp"
+                channel={selected.channel}
                 lastCustomerMessageAt={selected.last_customer_message_at}
                 language={selected.contact?.preferred_language}
                 onSendMessage={async (p) => {
                   await api('/api/messages/send', {
                     method: 'POST',
-                    body: JSON.stringify({ conversation_id: selected.id, type: p.type, body: p.body, template_name: p.templateName, translate: p.translate ?? false }),
+                    body: JSON.stringify({
+                      conversation_id: selected.id,
+                      type: p.type,
+                      body: p.body,
+                      template_name: p.templateName,
+                      subject: p.subject,
+                      translate: p.translate ?? false,
+                    }),
                   });
                   await loadDetail(selected.id, false);
                   await loadConversations();
@@ -347,10 +354,14 @@ export default function DashboardPage() {
               />
             ) : (
               <div className="px-4 py-2.5 text-[11px] text-slate-500 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                <span>View only. Replies happen on WhatsApp: the AI answers, or the Admin replies here.</span>
-                <a href={`https://wa.me/${selected.contact?.wa_id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline">
-                  <ExternalLink className="w-3.5 h-3.5" /> Open in WhatsApp
-                </a>
+                <span>View only. Replies happen on {selected.channel === 'email' ? 'Email' : 'WhatsApp'}: the AI answers, or authorized staff replies here.</span>
+                {selected.channel === 'email' ? (
+                  <span className="font-semibold text-slate-600">Email: {selected.contact?.email || selected.contact?.wa_id?.replace(/^email:/i, '')}</span>
+                ) : (
+                  <a href={`https://wa.me/${selected.contact?.wa_id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline">
+                    <ExternalLink className="w-3.5 h-3.5" /> Open in WhatsApp
+                  </a>
+                )}
               </div>
             )}
           </>
