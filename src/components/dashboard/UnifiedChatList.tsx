@@ -82,7 +82,7 @@ export function UnifiedChatList({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none text-[11px]">
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           {[
             { id: 'all', label: 'All' },
             { id: 'unread', label: 'Unread' },

@@ -13,6 +13,7 @@ import {
   PanelRightOpen,
   CreditCard,
   Lock,
+  Languages,
   PackageCheck,
   Loader2,
   X,
@@ -34,6 +35,10 @@ interface UnifiedChatHeaderProps {
   conversation: Conversation;
   /** Pausing by hand sends the owner's password. Throws on error (shown in the popup). */
   onModeChange: (mode: ConversationMode, password?: string) => Promise<void>;
+  /** "Translate to English" view (only for the viewer, nothing is sent). */
+  englishOn?: boolean;
+  englishBusy?: boolean;
+  onToggleEnglish?: () => void;
   /** Called after "Verify payment" succeeded (reload the chat). */
   onPaymentVerified?: () => Promise<void>;
   onTriggerAiNow?: () => Promise<void>;
@@ -48,6 +53,9 @@ export function UnifiedChatHeader({
   onModeChange,
   onTriggerAiNow,
   onPaymentVerified,
+  englishOn = false,
+  englishBusy = false,
+  onToggleEnglish,
   onTogglePanel,
   isPanelOpen = true,
   canToggleAi = true,
@@ -183,6 +191,22 @@ export function UnifiedChatHeader({
             <span className={`px-3 py-1.5 text-xs font-semibold rounded-full border ${aiOn ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
               {aiOn ? 'AI Responding' : 'Human Responding'}
             </span>
+          )}
+
+          {/* Show the chat in English for me only (customers still get their language). */}
+          {onToggleEnglish && (
+            <button
+              onClick={onToggleEnglish}
+              aria-pressed={englishOn}
+              aria-label={englishOn ? 'Show original' : 'Translate to English'}
+              title="Show this chat in English for you only. Messages to the customer still go in their language."
+              className={`p-2 md:px-3 md:py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs border transition-all ${
+                englishOn ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {englishBusy ? <Loader2 className="w-4 h-4 md:w-3.5 md:h-3.5 animate-spin" /> : <Languages className="w-4 h-4 md:w-3.5 md:h-3.5" />}
+              <span className="hidden md:inline">{englishOn ? 'Show original' : 'Translate to English'}</span>
+            </button>
           )}
 
           {/* Verify payment of the current order (owner's password) */}

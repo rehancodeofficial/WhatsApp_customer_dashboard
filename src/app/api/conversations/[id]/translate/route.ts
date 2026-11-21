@@ -9,12 +9,12 @@ import { callN8nBridge } from '@/lib/n8n-bridge';
 export const maxDuration = 60;
 
 // "Translate to English" in a chat: English text of the given messages, for the dashboard viewer only.
-// Nothing is sent to the customer. Each translation is saved on the message (raw.en / raw.en_t),
+// Nothing is sent to the customer. Each translation is saved on the message (raw.en2 / raw.en2_t),
 // so a message is translated once.
 const Body = z.object({ ids: z.array(z.string().min(1).max(100)).min(1).max(40) });
 
 async function toEnglish(text: string): Promise<string> {
-  const res = await callN8nBridge('translate', { text, language: 'English' }, 30000);
+  const res = await callN8nBridge('to_english', { text }, 30000);
   const out = String(res?.text || '').trim();
   if (!out || res?.error) throw new Error('Translation failed');
   return out;
@@ -42,18 +42,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let changed = false;
     try {
       if (m.body?.trim()) {
-        if (typeof raw.en !== 'string') {
-          raw.en = await toEnglish(m.body);
+        if (typeof raw.en2 !== 'string') {
+          raw.en2 = await toEnglish(m.body);
           changed = true;
         }
-        r.body = raw.en as string;
+        r.body = raw.en2 as string;
       }
       if (m.transcript_or_caption?.trim()) {
-        if (typeof raw.en_t !== 'string') {
-          raw.en_t = await toEnglish(m.transcript_or_caption);
+        if (typeof raw.en2_t !== 'string') {
+          raw.en2_t = await toEnglish(m.transcript_or_caption);
           changed = true;
         }
-        r.transcript = raw.en_t as string;
+        r.transcript = raw.en2_t as string;
       }
       if (changed) await db.from('messages').update({ raw }).eq('id', m.id);
     } catch {

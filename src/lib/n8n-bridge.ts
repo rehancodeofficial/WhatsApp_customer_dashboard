@@ -1,7 +1,7 @@
 // Calls the n8n "Dashboard Bridge" webhook (see N8N_CHANGES.md). n8n answers with JSON.
 import { N8N_DASHBOARD_WEBHOOK_URL, n8nBridgeEnabled } from '@/lib/config';
 
-export type BridgeAction = 'send_whatsapp' | 'send_email' | 'translate' | 'payment_verified' | 'supplier_delivered';
+export type BridgeAction = 'send_whatsapp' | 'send_email' | 'translate' | 'payment_verified' | 'supplier_delivered' | 'to_english';
 
 export async function callN8nBridge(action: BridgeAction, payload: Record<string, unknown>, timeoutMs = 20000): Promise<any> {
   if (!n8nBridgeEnabled()) throw new Error('n8n bridge is not configured');

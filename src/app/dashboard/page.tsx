@@ -18,7 +18,7 @@ import { NotificationBell, NotificationModal, NotificationsView, useNotification
 import { UnifiedChatList } from '@/components/dashboard/UnifiedChatList';
 import { UnifiedChatHeader } from '@/components/dashboard/UnifiedChatHeader';
 import { UnifiedMessageComposer } from '@/components/dashboard/UnifiedMessageComposer';
-import { UnifiedMessageList } from '@/components/dashboard/UnifiedMessageList';
+import { UnifiedMessageList, useEnglish } from '@/components/dashboard/UnifiedMessageList';
 import { UnifiedCustomerPanel } from '@/components/dashboard/UnifiedCustomerPanel';
 import { SettingsView } from '@/components/dashboard/SettingsView';
 import { useSupabase } from '@/components/providers/SupabaseProvider';
@@ -127,6 +127,9 @@ export default function DashboardPage() {
       setLoadingList(false);
     }
   }, []);
+
+  // "Translate to English": English view of the open chat for this viewer only.
+  const english = useEnglish(selectedId ?? undefined, messages);
 
   // Customers with a confirmed order → "Promising" filter (others are "Exploring").
   const [promisingIds, setPromisingIds] = useState<Set<string>>(new Set());
@@ -315,6 +318,9 @@ export default function DashboardPage() {
                 await loadConversations();
                 await loadDetail(selected.id, false);
               }}
+              englishOn={english.on}
+              englishBusy={english.busy}
+              onToggleEnglish={english.toggle}
               onPaymentVerified={async () => {
                 await loadConversations();
                 await loadDetail(selected.id, false);
@@ -323,7 +329,7 @@ export default function DashboardPage() {
               isPanelOpen={panelOpen}
               onTogglePanel={chatParty === 'customer' ? () => setPanelOpen(!panelOpen) : undefined}
             />
-            <UnifiedMessageList messages={messages} events={modeEvents} currentMode={selected.mode} party={chatParty} channel={selected.channel} conversationId={selected.id} />
+            <UnifiedMessageList messages={messages} events={modeEvents} currentMode={selected.mode} party={chatParty} channel={selected.channel} english={english} />
             {perms.has('chats.reply') && selected.mode === 'ai' ? (
               // While the AI is responding the reply box is off: switch to Human Responding first.
               <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">

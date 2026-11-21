@@ -16,15 +16,15 @@ interface Props {
   currentMode?: 'ai' | 'human' | 'handoff';
   party?: 'customer' | 'supplier';
   channel?: 'whatsapp' | 'email';
-  /** Enables the "Translate to English" button (viewer only, nothing is sent). */
-  conversationId?: string;
+  /** English view of the chat (the button sits in the chat header). */
+  english?: { on: boolean; en: En; error: string | null };
 }
 
-type En = Record<string, { body?: string; transcript?: string }>;
+export type En = Record<string, { body?: string; transcript?: string }>;
 const EN_KEY = 'pb-chat-english';
 
 /** English text of the chat, only for the person looking at the dashboard. Saved per browser. */
-function useEnglish(conversationId: string | undefined, messages: Message[]) {
+export function useEnglish(conversationId: string | undefined, messages: Message[]) {
   const [on, setOn] = useState(false);
   const [fetched, setFetched] = useState<En>({});
   const [busy, setBusy] = useState(false);
@@ -48,7 +48,7 @@ function useEnglish(conversationId: string | undefined, messages: Message[]) {
     const m: En = {};
     for (const x of messages) {
       const r = (x.raw || {}) as Record<string, unknown>;
-      if (typeof r.en === 'string' || typeof r.en_t === 'string') m[x.id] = { body: r.en as string | undefined, transcript: r.en_t as string | undefined };
+      if (typeof r.en2 === 'string' || typeof r.en2_t === 'string') m[x.id] = { body: r.en2 as string | undefined, transcript: r.en2_t as string | undefined };
     }
     return { ...m, ...fetched };
   }, [messages, fetched]);
@@ -100,9 +100,8 @@ function manualWindows(events: AIModeEvent[], currentMode?: string) {
   return out;
 }
 
-export function UnifiedMessageList({ messages, events = [], currentMode, party = 'customer', conversationId }: Props) {
+export function UnifiedMessageList({ messages, events = [], currentMode, party = 'customer', english = { on: false, en: {}, error: null } }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const english = useEnglish(conversationId, messages);
 
   const items = useMemo<Item[]>(() => {
     const windows = manualWindows(events, currentMode);
@@ -167,21 +166,6 @@ export function UnifiedMessageList({ messages, events = [], currentMode, party =
 
   return (
     <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-2 bg-[#f5efe6]" style={{ backgroundImage: 'radial-gradient(circle, rgba(30,41,59,0.05) 1px, transparent 1px)', backgroundSize: '18px 18px' }}>
-      {conversationId && items.length > 0 && (
-        <div className="sticky top-0 z-10 flex justify-end -mt-1 mb-1">
-          <button
-            onClick={english.toggle}
-            aria-pressed={english.on}
-            title="Show this chat in English for you only. Messages to the customer still go in their language."
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold shadow-sm border transition-colors ${
-              english.on ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {english.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Languages className="w-3.5 h-3.5" />}
-            {english.on ? 'Show original' : 'Translate to English'}
-          </button>
-        </div>
-      )}
       {english.on && english.error && <div className="text-center text-[11px] text-rose-600">{english.error}</div>}
       {items.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 text-xs">
