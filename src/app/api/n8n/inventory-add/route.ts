@@ -9,7 +9,14 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const items = parseStockItems(body?.items ?? body?.ai);
   if (!items.length) {
-    return NextResponse.json({ ok: false, added: [], problems: ['Could not read the stock details'], message: "❌ I couldn't read the stock details.\nSend it like:\nSTOCK iPhone 15 Pro 256GB Black Grade A 50 pcs cost 1100 sale 1200" });
+    return NextResponse.json({
+      ok: false,
+      need_more: true,
+      added: [],
+      problems: ['No stock details yet'],
+      message:
+        '📝 Sure, which stock should I add? Please send: brand, model, storage, color, grade (A+, A, B or C), quantity, cost price and sale price.\nFor example: iPhone 15 Pro 256GB Black Grade A 50 pcs cost 1100 sale 1200',
+    });
   }
   if (items.length > 30) return NextResponse.json({ ok: false, message: '❌ At most 30 items per message.' });
   try {

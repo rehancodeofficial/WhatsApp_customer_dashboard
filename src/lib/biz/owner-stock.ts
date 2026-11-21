@@ -51,14 +51,64 @@ export function parseStockItems(aiText: unknown): StockItem[] {
   }
 }
 
+/** Phone Buzz grades: A+ (brand new), A, B, C. Anything else is not a grade. */
+export function normalizeGrade(v: unknown): 'A+' | 'A' | 'B' | 'C' | '' {
+  const g = t(v).toLowerCase().replace(/^grade\s*/, '').replace(/\s+/g, '');
+  if (!g) return '';
+  if (/^(a\+|aplus|a-plus|new|brandnew|sealed|boxpack|nonpta-new)$/.test(g) || g.includes('new') || g === 'a+') return 'A+';
+  if (g === 'a' || g === 'b' || g === 'c') return g.toUpperCase() as 'A' | 'B' | 'C';
+  return '';
+}
+
+const REQUIRED: [keyof StockItem, string][] = [
+  ['brand', 'brand'],
+  ['model', 'model'],
+  ['storage', 'storage'],
+  ['color', 'color'],
+  ['grade', 'grade (A+, A, B or C)'],
+  ['quantity', 'quantity'],
+  ['unit_cost', 'cost price'],
+  ['sale_price', 'sale price'],
+];
+
+/** What is still missing per item (nothing is saved until every item is complete). */
+export function missingStockDetails(items: StockItem[]) {
+  return items
+    .map((i, n) => {
+      const miss = REQUIRED.filter(([k]) => {
+        if (k === 'grade') return !normalizeGrade(i.grade);
+        if (k === 'quantity' || k === 'unit_cost' || k === 'sale_price') return !num(i[k]);
+        return !t(i[k]);
+      }).map(([, label]) => label);
+      const label = [t(i.brand), t(i.model), t(i.storage), t(i.color)].filter(Boolean).join(' ') || `Item ${n + 1}`;
+      return { label, missing: miss };
+    })
+    .filter((x) => x.missing.length);
+}
+
 export interface StockResult {
   ok: boolean;
+  /** Details are missing: nothing was saved, `message` asks the owner for them. */
+  need_more?: boolean;
   added: { id: string; product: string; quantity: number; merged: boolean; sale_price: number | null }[];
   problems: string[];
   message: string;
 }
 
 export async function addOwnerStock(items: StockItem[]): Promise<StockResult> {
+  const gaps = missingStockDetails(items);
+  if (gaps.length) {
+    return {
+      ok: false,
+      need_more: true,
+      added: [],
+      problems: gaps.map((g) => `${g.label}: ${g.missing.join(', ')}`),
+      message:
+        '📝 Almost done. Nothing is saved yet, please send the missing details:\n' +
+        gaps.map((g) => `• ${g.label}: ${g.missing.join(', ')}`).join('\n') +
+        '\n\nJust reply with them, for example: Black, Grade A+, cost 1900, sale 1950',
+    };
+  }
   const added: StockResult['added'] = [];
   const problems: string[] = [];
   const rates = items.some((i) => t(i.currency) && t(i.currency).toUpperCase() !== INVENTORY_CURRENCY) ? await getRates(INVENTORY_CURRENCY) : null;
@@ -71,11 +121,13 @@ export async function addOwnerStock(items: StockItem[]): Promise<StockResult> {
 
   await watchInventory('n8n', async () => {
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    for (const i of items) {
+    for (let i of items) {
       const brand = t(i.brand);
       const model = t(i.model);
       const qty = Math.round(num(i.quantity) ?? 0);
-      const label = [brand, model, t(i.storage), t(i.color), t(i.grade) && 'Grade ' + t(i.grade).replace(/^grade\s*/i, '')].filter(Boolean).join(' ');
+      const grade = normalizeGrade(i.grade);
+      i = { ...i, grade };
+      const label = [brand, model, t(i.storage), t(i.color), grade && 'Grade ' + grade].filter(Boolean).join(' ');
       if (!brand || !model) {
         problems.push(`${label || 'An item'}: brand and model are needed`);
         continue;
@@ -107,7 +159,7 @@ export async function addOwnerStock(items: StockItem[]): Promise<StockResult> {
             Model: model,
             Storage: t(i.storage),
             Color: t(i.color),
-            Grade: t(i.grade).replace(/^grade\s*/i, ''),
+            Grade: grade,
             Warehouse: t(i.warehouse),
             Market_Region: t(i.market_region),
             Available_Qty: qty,

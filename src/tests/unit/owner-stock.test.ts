@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseStockItems } from '@/lib/biz/owner-stock';
+import { missingStockDetails, normalizeGrade, parseStockItems } from '@/lib/biz/owner-stock';
 
 describe('parseStockItems', () => {
   it('reads items from a fenced model answer', () => {
@@ -13,5 +13,20 @@ describe('parseStockItems', () => {
   it('returns nothing for text without JSON', () => {
     expect(parseStockItems('sorry, no idea')).toEqual([]);
     expect(parseStockItems('{bad json')).toEqual([]);
+  });
+});
+
+describe('grades and missing details', () => {
+  it('maps grades to A+, A, B, C', () => {
+    expect(normalizeGrade('Grade A+')).toBe('A+');
+    expect(normalizeGrade('brand new')).toBe('A+');
+    expect(normalizeGrade('b')).toBe('B');
+    expect(normalizeGrade('D')).toBe('');
+  });
+  it('lists what the owner still has to send', () => {
+    const full = { brand: 'Apple', model: 'iPhone 18 Pro', storage: '256GB', color: 'Black', grade: 'A+', quantity: 200, unit_cost: 1900, sale_price: 1950 };
+    expect(missingStockDetails([full])).toEqual([]);
+    const gaps = missingStockDetails([{ ...full, color: '', unit_cost: null as any, grade: 'D' }]);
+    expect(gaps[0].missing).toEqual(['color', 'grade (A+, A, B or C)', 'cost price']);
   });
 });
