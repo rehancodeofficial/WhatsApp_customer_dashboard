@@ -53,11 +53,12 @@ export function Splash() {
       className={`pb-splash fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#1E293B] transition-opacity duration-[450ms] ${phase === 'fade' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       <style>{`
-        @keyframes pb-pop { from { opacity: 0; transform: scale(.86) } to { opacity: 1; transform: scale(1) } }
-        @keyframes pb-up { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
+        /* Movement only, never hidden: the logo and text are readable from the first frame, even on slow phones. */
+        @keyframes pb-pop { from { transform: scale(.9) } to { transform: scale(1) } }
+        @keyframes pb-up { from { transform: translateY(6px) } to { transform: translateY(0) } }
         @keyframes pb-bar { 0% { transform: translateX(-100%) } 100% { transform: translateX(250%) } }
         .pb-splash .pb-logo { animation: pb-pop .6s cubic-bezier(.2,.8,.2,1) both }
-        .pb-splash .pb-text { animation: pb-up .6s .25s ease-out both }
+        .pb-splash .pb-text { animation: pb-up .6s .15s ease-out both }
         .pb-splash .pb-bar { animation: pb-bar 1.1s ease-in-out infinite }
         @media (prefers-reduced-motion: reduce) { .pb-splash .pb-logo, .pb-splash .pb-text, .pb-splash .pb-bar { animation: none } }
       `}</style>
