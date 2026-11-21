@@ -207,11 +207,21 @@ export default function DashboardPage() {
     await api(`/api/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }).catch(() => {});
   }, []);
 
-  const openChat = useCallback((conversationId: string, party: Party) => {
+  const openChat = useCallback((conversationIdOrWa: string, party: Party) => {
     setSection(party === 'supplier' ? 'supplier-chats' : 'customer-chats');
-    setSelectedId(conversationId);
+    // If conversationId is given directly
+    const direct = conversations.find((c) => c.id === conversationIdOrWa);
+    if (direct) {
+      setSelectedId(direct.id);
+    } else {
+      // If it's a wa_id or digits
+      const digits = conversationIdOrWa.replace(/[^0-9]/g, '');
+      const byWa = conversations.find((c) => c.contact?.wa_id === digits || c.contact?.wa_id === conversationIdOrWa);
+      if (byWa) setSelectedId(byWa.id);
+      else setSelectedId(conversationIdOrWa);
+    }
     setOpenNotification(null);
-  }, []);
+  }, [conversations]);
 
   // Link from an owner alert: /dashboard?chat=923001234567 opens that chat (customer or supplier).
   const deepLinkDone = useRef(false);

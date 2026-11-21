@@ -156,9 +156,14 @@ export function OverviewView({ name, perms, onOpen }: { name: string; perms: Set
                 <div className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                   {money(s.profit, undefined, true)}
                 </div>
-                <div className="text-[10px] text-orange-100/90 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-200"></span>
-                  this period
+                <div className="text-[10px] text-orange-100/90 flex flex-col items-end">
+                  {s.totalDiscount > 0 ? (
+                    <span className="font-semibold text-orange-200">
+                      -{money(s.totalDiscount, undefined, true)} disc
+                    </span>
+                  ) : (
+                    <span>this period</span>
+                  )}
                 </div>
               </div>
             </div>

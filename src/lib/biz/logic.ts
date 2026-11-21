@@ -81,6 +81,7 @@ export interface SalesAnalytics {
   revenuePrev: number;
   profit: number;
   profitPrev: number;
+  totalDiscount: number;
   orders: number;
   ordersPrev: number;
   unitsSold: number;
@@ -114,6 +115,7 @@ export function salesAnalytics(orders: Order[], products: Product[], customers: 
 
   const revenue = inRange.reduce((a, o) => a + o.total, 0);
   const profit = inRange.reduce((a, o) => a + profitOf(o), 0);
+  const totalDiscount = inRange.reduce((a, o) => a + (o.discount || 0), 0);
 
   // Bucket by day, or by week when the range is long.
   const bucketDays = days > 60 ? 7 : 1;
@@ -188,6 +190,7 @@ export function salesAnalytics(orders: Order[], products: Product[], customers: 
     revenuePrev: inPrev.reduce((a, o) => a + o.total, 0),
     profit,
     profitPrev: inPrev.reduce((a, o) => a + profitOf(o), 0),
+    totalDiscount,
     orders: inRange.length,
     ordersPrev: inPrev.length,
     unitsSold,

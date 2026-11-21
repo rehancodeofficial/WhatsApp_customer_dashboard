@@ -1,7 +1,7 @@
 'use client';
 // Owner notifications: everything the AI sends to the owner on WhatsApp also lands here.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, CheckCheck, ExternalLink, MessageCircle, ShoppingCart } from 'lucide-react';
+import { Bell, CheckCheck, MessageCircle, ShoppingCart } from 'lucide-react';
 import type { OwnerNotification } from '@/lib/biz/types';
 import { NOTIFICATION_TYPES } from '@/lib/biz/notifications';
 import { api, Button, Card, cx, dateTime, Empty, ErrorNote, Loading, Modal, PageHeader, PillTabs, SearchInput, StatusDot } from '../ui';
@@ -132,20 +132,10 @@ export function NotificationModal({ n, onClose, onOpenChat, onOpenOrders }: { n:
           <div className="rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-[13px] text-slate-800 whitespace-pre-wrap break-words shadow-sm">{n.body}</div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {n.conversation_id && onOpenChat && (
-            <Button onClick={() => onOpenChat(n.conversation_id!, party)}>
-              <MessageCircle className="w-4 h-4" /> Open {party} chat
+          {onOpenChat && (n.conversation_id || n.wa_id) && (
+            <Button onClick={() => onOpenChat((n.conversation_id || n.wa_id)!, party)}>
+              <MessageCircle className="w-4 h-4" /> Open Chat in Dashboard
             </Button>
-          )}
-          {n.wa_id && (
-            <a
-              href={`https://wa.me/${n.wa_id}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-full text-sm px-4 py-2.5 font-medium bg-[#25D366] text-white hover:opacity-90"
-            >
-              <ExternalLink className="w-4 h-4" /> WhatsApp +{n.wa_id}
-            </a>
           )}
           {n.order_no && onOpenOrders && (
             <Button variant="light" onClick={onOpenOrders}>

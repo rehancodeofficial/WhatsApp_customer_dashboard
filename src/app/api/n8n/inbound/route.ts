@@ -4,6 +4,7 @@ import { checkN8nSecret } from '@/lib/config';
 import { getRepo } from '@/lib/repo';
 import { alertOwnerNewMessage } from '@/lib/owner-chat-alert';
 import { isDeliveryConfirmation, handleCustomerDeliveryConfirmation } from '@/lib/biz/customer-delivery';
+import { isBargainingMessage, handleCustomerBargaining } from '@/lib/biz/bargaining';
 
 // Called by n8n for every customer WhatsApp message.
 // Returns { ai_enabled, mode } so the n8n IF node decides whether the AI may reply.
@@ -19,6 +20,18 @@ export async function POST(req: NextRequest) {
   try {
     const result = await getRepo().ingestInbound(parsed.data);
     const msgText = parsed.data.body || parsed.data.transcript_or_caption || '';
+
+    // Check if customer is asking for discount / bargaining
+    if (parsed.data.party !== 'supplier' && isBargainingMessage(msgText)) {
+      await handleCustomerBargaining({
+        origin: req.nextUrl.origin,
+        waId: parsed.data.wa_id,
+        customerName: parsed.data.name || parsed.data.profile_name,
+        messageText: msgText,
+      }).catch((e) => console.error('bargaining handler failed', e));
+      // AI is paused, so return mode 'human' and ai_enabled false to n8n
+      return NextResponse.json({ success: true, ...result, ai_enabled: false, mode: 'human' });
+    }
 
     // Check if customer is confirming order delivery (e.g. "hogya dliver thanks", "received", etc.)
     if (parsed.data.party !== 'supplier' && isDeliveryConfirmation(msgText)) {
