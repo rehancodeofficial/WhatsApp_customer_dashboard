@@ -86,15 +86,15 @@ export function UnifiedChatList({
           {[
             { id: 'all', label: 'All' },
             { id: 'unread', label: 'Unread' },
-            { id: 'starred', label: 'Starred', icon: Star },
-            { id: 'ai', label: 'AI', icon: Bot },
-            { id: 'human', label: 'Manual', icon: User },
             ...(promisingContactIds
               ? [
-                  { id: 'exploring', label: 'Exploring' },
                   { id: 'promising', label: 'Promising' },
+                  { id: 'exploring', label: 'Exploring' },
                 ]
               : []),
+            { id: 'ai', label: 'AI', icon: Bot },
+            { id: 'human', label: 'Manual', icon: User },
+            { id: 'starred', label: 'Starred', icon: Star },
           ].map((item: { id: string; label: string; icon?: React.ElementType }) => {
             const Icon = item.icon;
             const isSelected = filter === item.id;
