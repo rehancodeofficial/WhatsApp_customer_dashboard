@@ -254,7 +254,14 @@ export default function DashboardPage() {
               onTogglePanel={chatParty === 'customer' ? () => setPanelOpen(!panelOpen) : undefined}
             />
             <UnifiedMessageList messages={messages} events={modeEvents} currentMode={selected.mode} party={chatParty} />
-            {perms.has('chats.reply') && selected.channel !== 'email' ? (
+            {perms.has('chats.reply') && selected.channel !== 'email' && selected.mode === 'ai' ? (
+              // While the AI is responding the reply box is off: switch to Human Responding first.
+              <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex-1 min-w-[12rem] rounded-full border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-400 cursor-not-allowed select-none">
+                  AI is responding. Switch to Human Responding (top right) to reply.
+                </div>
+              </div>
+            ) : perms.has('chats.reply') && selected.channel !== 'email' ? (
               // The owner replies here: translated to the customer's language, sent from the business
               // number, and the chat goes to "human" (AI paused) until he presses Resume AI.
               <UnifiedMessageComposer

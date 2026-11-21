@@ -31,6 +31,10 @@ export async function POST(req: NextRequest) {
   const detail = await repo.getConversation(viewer, conversation_id);
   if (!detail) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
   const conv = detail.conversation;
+  // While the AI is responding nobody replies from the dashboard: switch to Human Responding first (owner's password).
+  if (conv.mode === 'ai') {
+    return NextResponse.json({ error: 'AI is responding in this chat. Switch to Human Responding first.' }, { status: 409 });
+  }
   const wa_id = conv.contact?.wa_id;
   if (!wa_id) return NextResponse.json({ error: 'Customer phone number missing' }, { status: 400 });
 
