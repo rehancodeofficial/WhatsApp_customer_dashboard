@@ -79,4 +79,6 @@ export const SetModeSchema = z.object({
   mode: ConversationModeEnum,
   reason: z.string().max(300).optional().nullable(),
   resume_in_minutes: z.number().int().positive().max(60 * 24 * 30).optional().nullable(),
+  /** Owner's password: needed to pause the AI by hand. */
+  password: z.string().max(200).optional(),
 });

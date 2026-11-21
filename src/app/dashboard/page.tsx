@@ -240,8 +240,12 @@ export default function DashboardPage() {
             </div>
             <UnifiedChatHeader
               conversation={selected}
-              onModeChange={async (mode, resumeMinutes) => {
-                await api(`/api/conversations/${selected.id}/mode`, { method: 'POST', body: JSON.stringify({ mode, resume_in_minutes: resumeMinutes ?? null }) });
+              onModeChange={async (mode, password) => {
+                await api(`/api/conversations/${selected.id}/mode`, { method: 'POST', body: JSON.stringify({ mode, password }) });
+                await loadConversations();
+                await loadDetail(selected.id, false);
+              }}
+              onPaymentVerified={async () => {
                 await loadConversations();
                 await loadDetail(selected.id, false);
               }}

@@ -244,3 +244,8 @@ export async function deleteStaff(actorId: string | null, id: string): Promise<v
   const { error } = await getAdminSupabase().auth.admin.deleteUser(id); // profile row cascades
   if (error) throw new StaffError(error.message, 500);
 }
+
+/** Demo: the owner account's email (used to confirm the owner's password for sensitive chat actions). */
+export function demoOwnerEmail(): string | null {
+  return demoStaff().find((x) => x.role === 'owner' && x.active)?.email ?? null;
+}
