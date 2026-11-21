@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AIModeEvent, Message } from '@/lib/types';
 import { formatTime } from '@/lib/utils';
-import { AlertCircle, Bot, Check, CheckCheck, Download, FileText, Hand, MessageSquare, User } from 'lucide-react';
+import { AlertCircle, Bot, Check, CheckCheck, Download, FileText, Hand, Languages, Loader2, MessageSquare, User } from 'lucide-react';
 
 // View-only WhatsApp-style chat. Shows customer/supplier messages, AI replies, and owner/staff replies.
 // When the AI was paused (manual period), owner/staff messages and customer replies are all displayed
@@ -16,6 +16,66 @@ interface Props {
   currentMode?: 'ai' | 'human' | 'handoff';
   party?: 'customer' | 'supplier';
   channel?: 'whatsapp' | 'email';
+  /** Enables the "Translate to English" button (viewer only, nothing is sent). */
+  conversationId?: string;
+}
+
+type En = Record<string, { body?: string; transcript?: string }>;
+const EN_KEY = 'pb-chat-english';
+
+/** English text of the chat, only for the person looking at the dashboard. Saved per browser. */
+function useEnglish(conversationId: string | undefined, messages: Message[]) {
+  const [on, setOn] = useState(false);
+  const [fetched, setFetched] = useState<En>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setOn(localStorage.getItem(EN_KEY) === '1');
+    } catch {}
+  }, []);
+  const toggle = () => {
+    setOn((v) => {
+      try {
+        localStorage.setItem(EN_KEY, v ? '0' : '1');
+      } catch {}
+      return !v;
+    });
+    setError(null);
+  };
+  // Translations already saved on the messages, plus the ones fetched now.
+  const en = useMemo<En>(() => {
+    const m: En = {};
+    for (const x of messages) {
+      const r = (x.raw || {}) as Record<string, unknown>;
+      if (typeof r.en === 'string' || typeof r.en_t === 'string') m[x.id] = { body: r.en as string | undefined, transcript: r.en_t as string | undefined };
+    }
+    return { ...m, ...fetched };
+  }, [messages, fetched]);
+  useEffect(() => {
+    if (!on || !conversationId) return;
+    const missing = messages
+      .filter((x) => !en[x.id] && ((x.body && x.body.trim()) || (x.transcript_or_caption && x.transcript_or_caption.trim())))
+      .slice(-40)
+      .map((x) => x.id);
+    if (!missing.length) return;
+    let live = true;
+    setBusy(true);
+    fetch(`/api/conversations/${conversationId}/translate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: missing }) })
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Translation failed');
+        if (live) setFetched((f) => ({ ...f, ...(d.translations || {}) }));
+        if (live && d.failed) setError(`${d.failed} message(s) could not be translated`);
+      })
+      .catch((e) => live && setError(e.message))
+      .finally(() => live && setBusy(false));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, conversationId, messages.length]);
+  return { on, toggle, en, busy, error };
 }
 
 type Item =
@@ -40,8 +100,9 @@ function manualWindows(events: AIModeEvent[], currentMode?: string) {
   return out;
 }
 
-export function UnifiedMessageList({ messages, events = [], currentMode, party = 'customer' }: Props) {
+export function UnifiedMessageList({ messages, events = [], currentMode, party = 'customer', conversationId }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const english = useEnglish(conversationId, messages);
 
   const items = useMemo<Item[]>(() => {
     const windows = manualWindows(events, currentMode);
@@ -106,6 +167,22 @@ export function UnifiedMessageList({ messages, events = [], currentMode, party =
 
   return (
     <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-2 bg-[#f5efe6]" style={{ backgroundImage: 'radial-gradient(circle, rgba(30,41,59,0.05) 1px, transparent 1px)', backgroundSize: '18px 18px' }}>
+      {conversationId && items.length > 0 && (
+        <div className="sticky top-0 z-10 flex justify-end -mt-1 mb-1">
+          <button
+            onClick={english.toggle}
+            aria-pressed={english.on}
+            title="Show this chat in English for you only. Messages to the customer still go in their language."
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold shadow-sm border transition-colors ${
+              english.on ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {english.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Languages className="w-3.5 h-3.5" />}
+            {english.on ? 'Show original' : 'Translate to English'}
+          </button>
+        </div>
+      )}
+      {english.on && english.error && <div className="text-center text-[11px] text-rose-600">{english.error}</div>}
       {items.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 text-xs">
           <MessageSquare className="w-6 h-6 mb-2 text-slate-400" />
@@ -167,12 +244,21 @@ export function UnifiedMessageList({ messages, events = [], currentMode, party =
                 </div>
                 {m.type === 'image' && m.media_url && <img src={m.media_url} alt="" className="mb-1.5 rounded-lg max-h-64 w-auto" />}
                 {m.type === 'audio' && m.media_url && <audio controls src={m.media_url} className="mb-1.5 h-8 w-56 max-w-full" />}
-                {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
+                {m.body && (
+                  <p className="whitespace-pre-wrap break-words" title={english.on && english.en[m.id]?.body ? m.body : undefined}>
+                    {english.on && english.en[m.id]?.body ? english.en[m.id]!.body : m.body}
+                  </p>
+                )}
                 {m.transcript_or_caption && (
                   <p className="mt-1 text-[11px] text-slate-600 border-l-2 border-orange-400 pl-2">
                     <span className="font-semibold">{m.type === 'audio' ? 'Voice note: ' : 'Image: '}</span>
-                    {m.transcript_or_caption}
+                    {english.on && english.en[m.id]?.transcript ? english.en[m.id]!.transcript : m.transcript_or_caption}
                   </p>
+                )}
+                {english.on && (english.en[m.id]?.body || english.en[m.id]?.transcript) && (
+                  <span className="mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                    <Languages className="w-2.5 h-2.5" /> English
+                  </span>
                 )}
                 {m.attachments?.map((a, ai) => (
                   <a key={ai} href={a.url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-2 text-[11px] text-slate-700 underline">

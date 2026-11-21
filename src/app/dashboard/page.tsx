@@ -323,7 +323,7 @@ export default function DashboardPage() {
               isPanelOpen={panelOpen}
               onTogglePanel={chatParty === 'customer' ? () => setPanelOpen(!panelOpen) : undefined}
             />
-            <UnifiedMessageList messages={messages} events={modeEvents} currentMode={selected.mode} party={chatParty} channel={selected.channel} />
+            <UnifiedMessageList messages={messages} events={modeEvents} currentMode={selected.mode} party={chatParty} channel={selected.channel} conversationId={selected.id} />
             {perms.has('chats.reply') && selected.mode === 'ai' ? (
               // While the AI is responding the reply box is off: switch to Human Responding first.
               <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
