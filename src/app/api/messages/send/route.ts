@@ -9,6 +9,9 @@ import { rateLimit } from '@/lib/rate-limit';
 import { logActivity } from '@/lib/security';
 import { translateForCustomer } from '@/lib/n8n-bridge';
 
+// Translation (n8n Gemini) + WhatsApp send can take a few seconds.
+export const maxDuration = 60;
+
 // The owner / agent replies to a customer from the dashboard.
 export async function POST(req: NextRequest) {
   const viewer = await requireViewer('chats.reply');
