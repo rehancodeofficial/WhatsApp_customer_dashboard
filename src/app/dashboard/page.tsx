@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ExternalLink, LogOut } from 'lucide-react';
+import { ArrowLeft, Clock, ExternalLink, LogOut } from 'lucide-react';
+import { get24HourWindowStatus } from '@/lib/whatsapp';
 import { Button, Modal } from '@/components/app/ui';
 import type { AIModeEvent, Conversation, Message } from '@/lib/types';
 import { AppShell, allowedSections, type Section } from '@/components/app/AppShell';
@@ -246,6 +247,21 @@ export default function DashboardPage() {
               <button onClick={() => setSelectedId(null)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 px-2 py-1.5 rounded-full hover:bg-slate-100">
                 <ArrowLeft className="w-4 h-4" /> All chats
               </button>
+              <span className="flex-1" />
+              {selected.channel !== 'email' && (() => {
+                const w = get24HourWindowStatus(selected.last_customer_message_at);
+                return (
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${w.isOpen ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                    <Clock className="w-3 h-3" />
+                    {w.isOpen ? w.remainingFormatted.replace(/\s*left$/i, '') : 'Closed'}
+                  </span>
+                );
+              })()}
+              {selected.contact?.lead_status && (
+                <span className="mr-1 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-200/80 px-2 py-0.5 rounded-full truncate max-w-[50%]">
+                  {selected.contact.lead_status}
+                </span>
+              )}
             </div>
             <UnifiedChatHeader
               conversation={selected}

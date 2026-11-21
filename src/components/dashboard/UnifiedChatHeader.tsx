@@ -111,13 +111,13 @@ export function UnifiedChatHeader({
   };
 
   return (
-    <div className="border-b border-slate-200/80 bg-white px-3 md:px-5 py-3 shrink-0">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="border-b border-slate-200/80 bg-white px-3 md:px-5 py-2 md:py-3 shrink-0">
+      <div className="flex md:flex-wrap items-center justify-between gap-2">
         {/* Contact info & Channel Tag */}
-        <div className="flex items-center space-x-3.5 min-w-0">
-          <div className="relative">
+        <div className="flex items-center space-x-2.5 md:space-x-3.5 min-w-0 flex-1">
+          <div className="relative shrink-0">
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-xs ${
+              className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-xs ${
                 isEmail ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-800'
               }`}
             >
@@ -132,42 +132,42 @@ export function UnifiedChatHeader({
             </span>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-900 tracking-tight">{displayName}</h2>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight truncate max-w-[10rem] md:max-w-none">{displayName}</h2>
               {contact?.country && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium border border-slate-200/60">
+                <span className="hidden md:inline text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium border border-slate-200/60">
                   {contact.country}
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1">
-              <span className="font-mono text-slate-600 font-medium">
+            <div className="flex md:flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5 md:mt-1 min-w-0">
+              <span className="font-mono text-slate-600 font-medium truncate">
                 {isEmail ? contact?.email : `+${contact?.wa_id}`}
               </span>
-              <span className="text-slate-300">·</span>
-              <span className="inline-flex items-center gap-1 font-medium text-slate-700 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-full">
+              <span className="hidden md:inline text-slate-300">·</span>
+              <span className="hidden md:inline-flex items-center gap-1 font-medium text-slate-700 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-full">
                 <span className="text-slate-400 font-normal">Language:</span>
                 <span className="font-semibold text-slate-800">{formatCleanLanguage(contact?.preferred_language)}</span>
               </span>
               {contact?.lead_status && (
-                <>
+                <span className="hidden md:contents">
                   <span className="text-slate-300">·</span>
                   <span className="text-orange-600 font-semibold bg-orange-50 border border-orange-200/80 px-2 py-0.5 rounded-full">
                     {contact.lead_status}
                   </span>
-                </>
+                </span>
               )}
             </div>
           </div>
         </div>
 
         {/* Action Controls & AI Takeover Toggle */}
-        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+        <div className="flex items-center gap-1.5 md:gap-3 shrink-0 md:flex-wrap">
           {/* 24-hour Meta Window for WhatsApp */}
           {!isEmail && (
             <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
+              className={`hidden md:flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 rounded-full text-[10px] md:text-[11px] font-medium whitespace-nowrap transition-all ${
                 windowStatus.isOpen
                   ? 'bg-orange-50 text-orange-700 border border-orange-200'
                   : 'bg-rose-50 text-rose-700 border border-rose-200'
@@ -175,7 +175,7 @@ export function UnifiedChatHeader({
               title="Meta Cloud API 24-Hour Messaging Window"
             >
               <Clock className="w-3.5 h-3.5" />
-              <span>{windowStatus.remainingFormatted}</span>
+              <span>{windowStatus.remainingFormatted.replace(/\s*left$/i, '')}<span className="hidden md:inline">{/left$/i.test(windowStatus.remainingFormatted) ? ' left' : ''}</span></span>
             </div>
           )}
 
@@ -190,11 +190,12 @@ export function UnifiedChatHeader({
             <button
               disabled={isUpdating}
               onClick={() => setConfirm('payment')}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition-all"
+              aria-label="Verify payment"
+              className="p-2 md:px-3 md:py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition-all"
               title={order ? `Mark ${order.order_no} as paid, turn the AI back on and thank the customer` : 'No unpaid order for this customer yet'}
             >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span>{order ? `Verify payment · ${order.order_no}` : 'Verify payment'}</span>
+              <CreditCard className="w-4 h-4 md:w-3.5 md:h-3.5" />
+              <span className="hidden md:inline">{order ? `Verify payment · ${order.order_no}` : 'Verify payment'}</span>
             </button>
           )}
 
@@ -203,11 +204,12 @@ export function UnifiedChatHeader({
             <button
               disabled={isUpdating}
               onClick={() => setConfirm('delivery')}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition-all"
+              aria-label="Order delivered"
+              className="p-2 md:px-3 md:py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition-all"
               title={deliveries.length ? 'Mark the order delivered: Inventory is updated, the supplier is thanked and the customer gets a follow-up' : 'No order waiting for delivery from this supplier'}
             >
-              <PackageCheck className="w-3.5 h-3.5" />
-              <span>{deliveries.length === 1 ? `Order delivered · ${deliveries[0].request_id}` : 'Order delivered'}</span>
+              <PackageCheck className="w-4 h-4 md:w-3.5 md:h-3.5" />
+              <span className="hidden md:inline">{deliveries.length === 1 ? `Order delivered · ${deliveries[0].request_id}` : 'Order delivered'}</span>
             </button>
           )}
 
@@ -219,13 +221,14 @@ export function UnifiedChatHeader({
               role="switch"
               aria-checked={aiOn}
               title={aiOn ? "Pause the AI for this chat (owner's password)" : 'Turn the AI back on for this chat'}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-2 shadow-xs transition-all disabled:opacity-60 ${
+              className={`px-2 md:px-3.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 md:gap-2 whitespace-nowrap shadow-xs transition-all disabled:opacity-60 ${
                 aiOn ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-amber-500 text-white hover:bg-amber-600'
               }`}
             >
               {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : aiOn ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
-              <span>{aiOn ? 'AI Responding' : 'Human Responding'}</span>
-              <span className={`relative ml-1 w-7 h-4 rounded-full ${aiOn ? 'bg-white/35' : 'bg-black/15'}`}>
+              <span className="md:hidden">{aiOn ? 'AI' : 'Human'}</span>
+              <span className="hidden md:inline">{aiOn ? 'AI Responding' : 'Human Responding'}</span>
+              <span className={`relative md:ml-1 w-7 h-4 rounded-full ${aiOn ? 'bg-white/35' : 'bg-black/15'}`}>
                 <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${aiOn ? 'left-3.5' : 'left-0.5'}`} />
               </span>
             </button>
@@ -245,12 +248,12 @@ export function UnifiedChatHeader({
       </div>
 
       {!aiOn && (
-        <div className="mt-2.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
+        <div className="mt-2 md:mt-2.5 px-3 md:px-3.5 py-1.5 md:py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] md:text-xs text-amber-900">
           <strong>Human Responding:</strong>{' '}
           {conversation.mode === 'handoff'
             ? 'handed over to sales automatically, the AI is paused.'
             : 'the AI is paused by hand and stays paused until you turn it back on.'}{' '}
-          Reply below, it is translated to the {isSupplier ? 'supplier' : 'customer'}&apos;s language.
+          <span className="hidden md:inline">Reply below, it is translated to the {isSupplier ? 'supplier' : 'customer'}&apos;s language.</span>
         </div>
       )}
 
