@@ -36,7 +36,8 @@ export function cleanLanguage(v: string | null | undefined) {
  */
 export async function translateForCustomer(text: string, language: string | null | undefined): Promise<{ text: string; language: string; translated: boolean }> {
   const lang = cleanLanguage(language);
-  if (/^(english|en)$/i.test(lang) || !text.trim()) return { text, language: lang, translated: false };
+  // Always translated, English too: the owner may write in Urdu to an English-speaking customer.
+  if (!text.trim()) return { text, language: lang, translated: false };
   const res = await callN8nBridge('translate', { text, language: lang }, 30000);
   const out = String(res?.text || '').trim();
   if (!out || res?.error) throw new Error('Translation failed' + (res?.error ? ': ' + res.error : ''));

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
-  const { conversation_id, type, body, template_name, template_language, translate } = parsed.data;
+  const { conversation_id, type, body, template_name, template_language } = parsed.data;
   if (type === 'text' && !body?.trim()) return NextResponse.json({ error: 'Message is empty' }, { status: 400 });
   if (type === 'template' && !template_name) return NextResponse.json({ error: 'Template name is required' }, { status: 400 });
 
@@ -50,13 +50,14 @@ export async function POST(req: NextRequest) {
   // Owner writes in his language; the customer gets it in theirs (n8n Gemini).
   let outText = body?.trim() || '';
   let translation: { language: string; translated: boolean } | null = null;
-  if (type === 'text' && translate && !isDemoMode()) {
+  // Every manual reply goes out in the customer's / supplier's own language.
+  if (type === 'text' && !isDemoMode()) {
     try {
       const t = await translateForCustomer(outText, conv.contact?.preferred_language);
       outText = t.text;
       translation = { language: t.language, translated: t.translated };
     } catch (err: any) {
-      return NextResponse.json({ error: `${err.message || 'Translation failed'}. Try again, or turn translation off to send your text as it is.` }, { status: 502 });
+      return NextResponse.json({ error: `${err.message || 'Translation failed'}. Nothing was sent, try again.` }, { status: 502 });
     }
   }
 

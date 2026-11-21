@@ -37,8 +37,6 @@ export function UnifiedMessageComposer({
 }: UnifiedMessageComposerProps) {
   const [text, setText] = useState('');
   const lang = String(language || '').replace(/\s*\(auto\)\s*/gi, '').trim() || 'English';
-  const needsTranslation = !/^(english|en)$/i.test(lang);
-  const [translate, setTranslate] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [subject, setSubject] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -63,7 +61,7 @@ export function UnifiedMessageComposer({
         type: 'text',
         body: text.trim(),
         subject: isEmail ? subject.trim() || 'Re: PhoneBuzz Inquiry' : undefined,
-        translate: needsTranslation && translate,
+        translate: true,
       });
       setText('');
       setSubject('');
@@ -166,12 +164,11 @@ export function UnifiedMessageComposer({
       {error && <div className="mb-2 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700">{error}</div>}
 
       {/* Translation: the owner writes in his language, the customer reads theirs. */}
-      {!isEmail && needsTranslation && (
-        <label className="mb-2 flex items-center gap-2 text-[11px] text-slate-600 cursor-pointer select-none w-fit">
-          <input type="checkbox" checked={translate} onChange={(e) => setTranslate(e.target.checked)} className="w-3.5 h-3.5 accent-orange-500" />
+      {!isEmail && (
+        <div className="mb-2 flex items-center gap-2 text-[11px] text-slate-600 select-none w-fit">
           <Languages className="w-3.5 h-3.5 text-orange-600" />
-          {translate ? <>Translated to <b className="text-slate-800">{lang}</b> before sending</> : <>Send exactly as typed (no translation)</>}
-        </label>
+          <span>Always sent in <b className="text-slate-800">{lang}</b> (their language)</span>
+        </div>
       )}
 
       {/* Composer Input Area */}
@@ -202,9 +199,7 @@ export function UnifiedMessageComposer({
               isEmail
                 ? 'Compose reply email to customer (Shift+Enter for newline, Enter to send)...'
                 : windowStatus.isOpen
-                ? needsTranslation && translate
-                  ? `Write in any language, it goes out in ${lang} (Enter to send)…`
-                  : 'Type WhatsApp reply (Enter to send)...'
+                ? `Write in any language, it goes out in ${lang} (Enter to send)…`
                 : '24h window closed — click Template icon to re-engage customer'
             }
             className="w-full bg-transparent border-none outline-none resize-none text-xs text-slate-900 placeholder-slate-400 max-h-32"

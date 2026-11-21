@@ -22,6 +22,8 @@ interface UnifiedChatListProps {
   onSelect: (id: string) => void;
   onToggleStar?: (id: string, currentStarred: boolean) => void;
   initialFilter?: string;
+  /** Customers with a confirmed order (Promising); the rest are Exploring. Omit for supplier chats. */
+  promisingContactIds?: Set<string>;
 }
 
 export function UnifiedChatList({
@@ -30,7 +32,10 @@ export function UnifiedChatList({
   onSelect,
   onToggleStar,
   initialFilter = 'all',
+  promisingContactIds,
 }: UnifiedChatListProps) {
+  const isPromising = (c: Conversation) =>
+    !!promisingContactIds?.has(c.contact_id) || /payment verified|order confirmed|confirmed|paid|delivered/i.test(c.contact?.lead_status || '');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>(initialFilter);
 
@@ -55,6 +60,8 @@ export function UnifiedChatList({
     if (filter === 'human') return c.mode === 'human' || c.mode === 'handoff';
     if (filter === 'starred') return !!c.is_starred;
     if (filter === 'archived') return !!c.is_archived;
+    if (filter === 'exploring') return !isPromising(c);
+    if (filter === 'promising') return isPromising(c);
 
     return true;
   });
@@ -80,7 +87,15 @@ export function UnifiedChatList({
             { id: 'all', label: 'All' },
             { id: 'unread', label: 'Unread' },
             { id: 'starred', label: 'Starred', icon: Star },
-          ].map((item) => {
+            { id: 'ai', label: 'AI', icon: Bot },
+            { id: 'human', label: 'Manual', icon: User },
+            ...(promisingContactIds
+              ? [
+                  { id: 'exploring', label: 'Exploring' },
+                  { id: 'promising', label: 'Promising' },
+                ]
+              : []),
+          ].map((item: { id: string; label: string; icon?: React.ElementType }) => {
             const Icon = item.icon;
             const isSelected = filter === item.id;
             return (

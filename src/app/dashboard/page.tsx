@@ -97,6 +97,14 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Customers with a confirmed order → "Promising" filter (others are "Exploring").
+  const [promisingIds, setPromisingIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    api<{ contact_ids: string[] }>('/api/conversations/promising')
+      .then((d) => setPromisingIds(new Set(d.contact_ids)))
+      .catch(() => {});
+  }, [conversations.length]);
+
   const loadDetail = useCallback(async (id: string, markRead = true) => {
     try {
       const data = await api<{ conversation: Conversation; messages: Message[]; events: AIModeEvent[] }>(`/api/conversations/${id}?markRead=${markRead}`);
@@ -222,6 +230,7 @@ export default function DashboardPage() {
           <UnifiedChatList
             key={chatParty}
             conversations={partyChats}
+            promisingContactIds={chatParty === 'customer' ? promisingIds : undefined}
             selectedId={selectedId}
             onSelect={(id) => setSelectedId(id)}
             onToggleStar={(id, starred) => perms.has('chats.organize') && patchConversation(id, { is_starred: !starred })}
