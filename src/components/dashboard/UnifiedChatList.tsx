@@ -82,7 +82,7 @@ export function UnifiedChatList({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+        <div className="flex flex-wrap items-center gap-[3px] text-[10px]">
           {[
             { id: 'all', label: 'All' },
             { id: 'unread', label: 'Unread' },
@@ -92,8 +92,8 @@ export function UnifiedChatList({
                   { id: 'exploring', label: 'Exploring' },
                 ]
               : []),
-            { id: 'ai', label: 'AI', icon: Bot },
-            { id: 'human', label: 'Manual', icon: User },
+            { id: 'ai', label: 'AI' },
+            { id: 'human', label: 'Manual' },
             { id: 'starred', label: 'Starred', icon: Star },
           ].map((item: { id: string; label: string; icon?: React.ElementType }) => {
             const Icon = item.icon;
@@ -102,13 +102,13 @@ export function UnifiedChatList({
               <button
                 key={item.id}
                 onClick={() => setFilter(item.id)}
-                className={`px-2.5 py-1 rounded-full font-medium transition-all flex items-center space-x-1 whitespace-nowrap ${
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all flex items-center whitespace-nowrap ${
                   isSelected
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
                 }`}
               >
-                {Icon && <Icon className="w-3 h-3 mr-0.5" />}
+                {Icon && <Icon className="w-2.5 h-2.5 mr-0.5" />}
                 <span>{item.label}</span>
               </button>
             );
