@@ -3,6 +3,7 @@ import { checkN8nSecret } from '@/lib/config';
 import { readRows, resolveTab, writeRow, type WriteOp } from '@/lib/biz/sheet-store';
 import { resolveSheet, syncRows } from '@/lib/biz/sheet-sync';
 import { watchInventory } from '@/lib/biz/inventory-sync';
+import { normalizeGrade } from '@/lib/biz/owner-stock';
 
 // Replaces the Google Sheets nodes of the n8n workflow (same node names, same columns).
 //
@@ -34,6 +35,42 @@ function withCustomerPrice(rows: Record<string, unknown>[], q: URLSearchParams) 
   });
 }
 
+const norm = (v: unknown) => String(v ?? '').toLowerCase().replace(/[^a-z0-9+]/g, '');
+const normModel = (v: unknown) => norm(v).replace(/^(apple|samsung|google|xiaomi)/, '');
+const normStorage = (v: unknown) => norm(v).replace(/gb$/, '').replace(/tb$/, '000');
+
+/**
+ * The AI asks for one product (?model=&storage=&grade=&color=). Only rows that really match are returned,
+ * so it can never quote the price of a different phone. No match -> one "not in stock" row that tells
+ * the AI not to quote and to raise a supplier request. Without ?model the whole inventory is returned.
+ */
+function matchInventory(rows: Record<string, unknown>[], q: URLSearchParams) {
+  const model = normModel(q.get('model'));
+  if (!model) return rows;
+  const storage = normStorage(q.get('storage'));
+  const grade = normalizeGrade(q.get('grade'));
+  const color = norm(q.get('color'));
+  const hits = rows.filter((r) => {
+    if (normModel(r.Model) !== model) return false;
+    if (storage && normStorage(r.Storage) && normStorage(r.Storage) !== storage) return false;
+    if (grade && normalizeGrade(r.Grade) && normalizeGrade(r.Grade) !== grade) return false;
+    if (color && norm(r.Color) && norm(r.Color) !== color) return false;
+    return Number(r.Available_Qty || 0) > 0 && !/out/i.test(String(r.Stock_Status || ''));
+  });
+  if (hits.length) return hits;
+  const asked = [q.get('brand'), q.get('model'), q.get('storage'), grade && 'Grade ' + grade, q.get('color')].filter(Boolean).join(' ');
+  return [
+    {
+      In_Stock: false,
+      Requested: asked,
+      Note:
+        'NOT IN STOCK: ' + asked + ' is not in the Phone Buzz inventory. Do NOT give any price or say it is available. ' +
+        'Tell the customer you will check the availability with the team and get back shortly. ' +
+        'As soon as brand, model, storage, color, grade, quantity and delivery country are known, set action = "supplier_request".',
+    },
+  ];
+}
+
 const truthy = (v: unknown) => v === true || v === 'true' || v === 1 || v === '1';
 
 function auth(req: NextRequest) {
@@ -48,7 +85,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shee
     const rows = await readRows(tab);
     // The AI tools only need the content, not internal row numbers.
     const clean = rows.map(({ row_number, ...r }) => r);
-    if (tab === 'Inventory') return NextResponse.json(withCustomerPrice(clean, req.nextUrl.searchParams));
+    if (tab === 'Inventory') return NextResponse.json(withCustomerPrice(matchInventory(clean, req.nextUrl.searchParams), req.nextUrl.searchParams));
     return NextResponse.json(clean);
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
