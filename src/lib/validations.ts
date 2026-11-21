@@ -21,7 +21,7 @@ const waId = z.preprocess((v) => {
   const t = String(v ?? '').trim();
   if (/^email:/i.test(t) || t.includes('@')) return 'email:' + t.replace(/^email:/i, '').toLowerCase();
   return t.replace(/[^0-9]/g, '');
-}, z.union([z.string().regex(/^email:[^@\s]+@[^@\s]+\.[^@\s]+$/).max(200), z.string().min(6).max(20)]));
+}, z.union([z.string().regex(/^email:[^@\s]+@[^@\s]+\.[^@\s]+$/).max(200), z.string().regex(/^[0-9]{6,20}$/)]));
 
 const party = z.preprocess((v) => (v === '' || v == null ? undefined : String(v).toLowerCase()), z.enum(['customer', 'supplier']).optional());
 
