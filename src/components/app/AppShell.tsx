@@ -149,7 +149,7 @@ export function AppShell({
   section: Section;
   onSection: (s: Section) => void;
   perms: Set<string>;
-  user: { name: string; email?: string; roleLabel: string };
+  user: { name: string; email?: string; roleLabel: string; avatarUrl?: string | null };
   badges?: Partial<Record<Section, number>>;
   /** Notification bell (rendered in the top bar). */
   bell?: React.ReactNode;
@@ -240,9 +240,13 @@ export function AppShell({
             {bell}
             <div className="relative" ref={menuRef}>
               <button onClick={() => setMenu(!menu)} className="flex items-center gap-2 bg-white rounded-full pl-1 pr-2 sm:pr-3 py-1 border border-slate-200/70">
-                <span className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 text-xs font-bold flex items-center justify-center">
-                  {user.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
-                </span>
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <span className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 text-xs font-bold flex items-center justify-center">
+                    {user.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+                  </span>
+                )}
                 <span className="hidden sm:block text-left leading-tight">
                   <span className="block text-xs font-semibold text-slate-800 max-w-36 truncate">{user.name}</span>
                   <span className="block text-[10px] text-slate-500">{user.roleLabel}</span>

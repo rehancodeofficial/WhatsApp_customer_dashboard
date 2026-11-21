@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { CheckCircle2, KeyRound, Mail, ShieldCheck, ShieldOff, Smartphone } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Camera, CheckCircle2, KeyRound, Mail, Phone, ShieldCheck, ShieldOff, Smartphone, Trash2 } from 'lucide-react';
 import { api, Button, Card, CardHeader, Chip, ErrorNote, Field, inputCls, PillTabs } from '@/components/app/ui';
 
 type Tab = 'profile' | 'security';
 interface Profile {
   name: string;
-  email: string;
   username?: string | null;
   role: string;
   recovery_email: string | null;
+  whatsapp?: string | null;
+  avatar_url?: string | null;
 }
 
 // Settings: Profile (name, recovery email, password) and Security (two-factor with Microsoft Authenticator).
@@ -74,15 +75,92 @@ function CodeField({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
+/** Square-crops and shrinks a photo to 256 px JPEG in the browser, so uploads stay small. */
+function shrinkPhoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error('Use a JPG, PNG or WebP photo'));
+    if (file.size > 15 * 1024 * 1024) return reject(new Error('Photo is too large (max 15 MB)'));
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const side = Math.min(img.width, img.height);
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      c.getContext('2d')!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Could not read this photo'));
+    };
+    img.src = url;
+  });
+}
+
+/** Popup after "Save": asks the current code from Microsoft Authenticator. */
+function CodePopup({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (code: string) => Promise<void> }) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const ready = code.replace(/\s/g, '').length === 6;
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ready) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await onConfirm(code.replace(/\s/g, ''));
+    } catch (x: any) {
+      setErr(x.message);
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 px-4" onMouseDown={(e) => e.target === e.currentTarget && !busy && onCancel()}>
+      <form onSubmit={submit} role="dialog" aria-modal="true" aria-label="Confirm with Microsoft Authenticator" className="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-orange-600" />
+          <h3 className="text-sm font-bold text-slate-900">Confirm with Microsoft Authenticator</h3>
+        </div>
+        <p className="text-xs text-slate-600">Enter the current 6-digit code from the app to save your profile.</p>
+        <input
+          autoFocus
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={7}
+          className={inputCls + ' font-mono tracking-[0.3em] text-center text-lg'}
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/[^0-9 ]/g, ''))}
+          placeholder="123 456"
+        />
+        {err && <p className="text-xs text-rose-600">{err}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCancel} disabled={busy} className="px-3 py-2 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-100">
+            Cancel
+          </button>
+          <Button type="submit" loading={busy} disabled={!ready}>
+            Confirm
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function ProfileTab() {
   const [p, setP] = useState<Profile | null>(null);
   const [name, setName] = useState('');
   const [recovery, setRecovery] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  // undefined = unchanged, '' = remove, data URL = new photo
+  const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [askCode, setAskCode] = useState(false);
   const mfaOn = useMfaOn();
-  const [code, setCode] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api<Profile>('/api/me/profile')
@@ -90,21 +168,47 @@ function ProfileTab() {
         setP(d);
         setName(d.name);
         setRecovery(d.recovery_email || '');
+        setWhatsapp(d.whatsapp ? '+' + d.whatsapp : '');
       })
       .catch((e) => setErr(e.message));
   }, []);
 
+  const shown = photo !== undefined ? photo : p?.avatar_url || '';
+  const initials = (name || p?.name || '?').split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    setErr(null);
+    try {
+      setPhoto(await shrinkPhoto(f));
+    } catch (e: any) {
+      setErr(e.message);
+    }
+  };
+
+  const send = async (code?: string) => {
+    const body: Record<string, string> = { name, whatsapp: whatsapp.trim() };
+    if (p?.role === 'owner') body.recovery_email = recovery.trim();
+    if (photo !== undefined) body.avatar = photo;
+    if (code) body.code = code;
+    const r = await api<{ avatar_url?: string | null }>('/api/me/profile', { method: 'PATCH', body: JSON.stringify(body) });
+    if (photo !== undefined) {
+      setP((x) => (x ? { ...x, avatar_url: r.avatar_url ?? null } : x));
+      setPhoto(undefined);
+    }
+    setAskCode(false);
+    setOk('Profile saved.');
+    // Top bar shows the new name / photo.
+    window.dispatchEvent(new Event('pb-profile-updated'));
+  };
+
   const save = async () => {
-    setBusy(true);
     setErr(null);
     setOk(null);
+    if (mfaOn) return setAskCode(true);
+    setBusy(true);
     try {
-      const body: Record<string, string> = { name };
-      if (p?.role === 'owner') body.recovery_email = recovery.trim();
-      if (mfaOn) body.code = code;
-      await api('/api/me/profile', { method: 'PATCH', body: JSON.stringify(body) });
-      setCode('');
-      setOk('Profile saved.');
+      await send();
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -115,10 +219,28 @@ function ProfileTab() {
   return (
     <>
       <Card>
-        <CardHeader title="Profile" subtitle="Your name and sign-in details" right={p && <Chip tone={p.role === 'owner' ? 'orange' : 'slate'}>{p.role === 'owner' ? 'Admin' : 'Staff'}</Chip>} />
+        <CardHeader title="Profile" subtitle="Your photo, name and WhatsApp number" right={p && <Chip tone={p.role === 'owner' ? 'orange' : 'slate'}>{p.role === 'owner' ? 'Admin' : 'Staff'}</Chip>} />
         <ErrorNote text={err} />
         <Saved text={ok} />
         <div className="space-y-3">
+          <div className="flex items-center gap-4">
+            {shown ? (
+              <img src={shown} alt="" className="w-20 h-20 rounded-full object-cover border border-slate-200" />
+            ) : (
+              <span className="w-20 h-20 rounded-full bg-orange-100 text-orange-700 text-xl font-bold flex items-center justify-center">{initials}</span>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
+              <button type="button" onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50">
+                <Camera className="w-4 h-4" /> {shown ? 'Change photo' : 'Upload photo'}
+              </button>
+              {shown && (
+                <button type="button" onClick={() => setPhoto('')} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl text-rose-600 hover:bg-rose-50">
+                  <Trash2 className="w-4 h-4" /> Remove
+                </button>
+              )}
+            </div>
+          </div>
           <Field label="Full name">
             <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
@@ -126,8 +248,11 @@ function ProfileTab() {
             <Field label="Username" hint="You sign in with this. The Admin can change it in Team & Access.">
               <input className={inputCls + ' bg-slate-50 text-slate-500 font-mono'} value={p?.username || ''} readOnly />
             </Field>
-            <Field label="Email" hint="For notifications and password help.">
-              <input className={inputCls + ' bg-slate-50 text-slate-500'} value={p?.email || ''} readOnly />
+            <Field label="WhatsApp number" hint="With country code. Same number as in Team & Access.">
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input className={inputCls + ' pl-9'} type="tel" inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+92 300 1234567" />
+              </div>
             </Field>
           </div>
           {p?.role === 'owner' && (
@@ -138,14 +263,14 @@ function ProfileTab() {
               </div>
             </Field>
           )}
-          {mfaOn && <CodeField value={code} onChange={setCode} />}
           <div className="flex justify-end">
-            <Button onClick={save} loading={busy} disabled={!p || (mfaOn && code.replace(/\s/g, '').length !== 6)}>
+            <Button onClick={save} loading={busy} disabled={!p}>
               Save profile
             </Button>
           </div>
         </div>
       </Card>
+      {askCode && <CodePopup onCancel={() => setAskCode(false)} onConfirm={(c) => send(c)} />}
       <ChangePassword />
     </>
   );

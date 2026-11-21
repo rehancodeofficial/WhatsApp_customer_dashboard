@@ -12,6 +12,7 @@ import type { Viewer } from '@/lib/repo/types';
 
 export interface SessionViewer extends Viewer {
   id: string;
+  avatar_url?: string | null;
   email: string;
   name: string;
   roleName: string | null;
@@ -25,7 +26,7 @@ export async function getViewer(): Promise<SessionViewer | null> {
     const u = uid ? demoFindStaff(uid) : null;
     if (!u || !u.active) return null;
     const r = u.role === 'owner' ? null : await getRole(u.role_id);
-    return { id: u.id, role: u.role, name: u.full_name, email: u.email, roleName: r?.name ?? null, permissions: r?.permissions ?? [] };
+    return { id: u.id, role: u.role, name: u.full_name, email: u.email, roleName: r?.name ?? null, permissions: r?.permissions ?? [], avatar_url: (u as any).avatar_url ?? null };
   }
   const supabase = await createServerSupabase();
   const {
@@ -53,6 +54,7 @@ export async function getViewer(): Promise<SessionViewer | null> {
     role,
     name: profile.full_name || user.email || 'Staff',
     email: user.email || '',
+    avatar_url: (user.user_metadata as any)?.avatar_url ?? null,
     roleName: r?.name ?? null,
     permissions: r?.permissions ?? [],
   };

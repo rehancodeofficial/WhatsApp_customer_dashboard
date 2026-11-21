@@ -24,7 +24,7 @@ import { SettingsView } from '@/components/dashboard/SettingsView';
 import { useSupabase } from '@/components/providers/SupabaseProvider';
 
 interface MeInfo {
-  viewer: { id: string; role: 'owner' | 'agent'; name: string; email: string; roleLabel: string };
+  viewer: { id: string; role: 'owner' | 'agent'; name: string; email: string; roleLabel: string; avatar_url?: string | null };
   permissions: string[];
   demo: boolean;
   whatsappLive: boolean;
@@ -105,7 +105,11 @@ export default function DashboardPage() {
   selectedRef.current = selectedId;
 
   useEffect(() => {
-    api<MeInfo>('/api/me').then(setMe).catch(() => {});
+    const load = () => api<MeInfo>('/api/me').then(setMe).catch(() => {});
+    load();
+    // Settings → Profile saved: refresh the name / photo in the top bar.
+    window.addEventListener('pb-profile-updated', load);
+    return () => window.removeEventListener('pb-profile-updated', load);
   }, []);
 
   const perms = new Set(me?.permissions || []);
@@ -391,7 +395,7 @@ export default function DashboardPage() {
           if (s !== 'customer-chats' && s !== 'supplier-chats') setSelectedId(null);
         }}
         perms={perms}
-        user={{ name: me.viewer.name, email: me.viewer.email, roleLabel: me.viewer.roleLabel }}
+        user={{ name: me.viewer.name, email: me.viewer.email, roleLabel: me.viewer.roleLabel, avatarUrl: me.viewer.avatar_url }}
         badges={{ 'customer-chats': unreadOf('customer'), 'supplier-chats': unreadOf('supplier'), notifications: notif.data?.unread }}
         bell={perms.has('notifications.view') ? <NotificationBell data={notif.data} onOpen={openNotificationRow} onSeeAll={() => setSection('notifications')} markRead={notif.markRead} /> : undefined}
         onSignOut={signOut}

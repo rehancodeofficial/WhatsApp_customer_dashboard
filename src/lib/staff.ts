@@ -18,6 +18,8 @@ export interface StaffUser {
   last_sign_in_at?: string | null;
   /** Sign-in name (unique, lower case). */
   username?: string | null;
+  /** Profile photo URL (Settings → Profile). */
+  avatar_url?: string | null;
   /** WhatsApp number (digits with country code): new passwords from the Admin are sent here. */
   whatsapp?: string | null;
 }
@@ -205,6 +207,7 @@ export async function updateStaff(
     if (u.role === 'owner') u.role_id = null;
     if (typeof changes.active === 'boolean') u.active = changes.active;
     if (changes.password) u.hash = hashPassword(changes.password);
+    if (changes.whatsapp !== undefined) u.whatsapp = cleanPhone(changes.whatsapp);
     return strip(u);
   }
 
@@ -248,4 +251,14 @@ export async function deleteStaff(actorId: string | null, id: string): Promise<v
 /** Demo: the owner account's email (used to confirm the owner's password for sensitive chat actions). */
 export function demoOwnerEmail(): string | null {
   return demoStaff().find((x) => x.role === 'owner' && x.active)?.email ?? null;
+}
+
+/** Demo: profile photo kept in memory. */
+export function demoSetAvatar(id: string, url: string | null) {
+  const u = demoStaff().find((x) => x.id === id);
+  if (u) u.avatar_url = url;
+}
+export function demoStaffRecord(id: string) {
+  const u = demoStaff().find((x) => x.id === id);
+  return u ? { whatsapp: u.whatsapp ?? null, avatar_url: u.avatar_url ?? null } : null;
 }
