@@ -25,7 +25,7 @@ export function useNotifications(enabled: boolean) {
   const [data, setData] = useState<{ unread: number; notifications: NotificationRow[] } | null>(null);
   const load = useCallback(() => {
     if (!enabled) return;
-    api<{ unread: number; notifications: NotificationRow[] }>('/api/notifications?limit=200').then(setData).catch(() => {});
+    api<{ unread: number; notifications: NotificationRow[] }>('/api/notifications?limit=200').then(setData).catch(() => { });
   }, [enabled]);
   useEffect(() => {
     load();
@@ -34,7 +34,7 @@ export function useNotifications(enabled: boolean) {
     return () => clearInterval(t);
   }, [load, enabled]);
   const markRead = async (ids: string[] | 'all') => {
-    await api('/api/notifications', { method: 'POST', body: JSON.stringify({ ids }) }).catch(() => {});
+    await api('/api/notifications', { method: 'POST', body: JSON.stringify({ ids }) }).catch(() => { });
     load();
   };
   return { data, reload: load, markRead };
@@ -196,7 +196,7 @@ export function NotificationsView({
         {!data ? (
           <Loading />
         ) : !list.length ? (
-          <Empty title="Nothing here" text="Notifications appear when n8n sends the owner an alert (see N8N_CHANGES.md step 10)." />
+          <Empty title="Nothing here" text="Notifications appear when n8n sends the owner an alert." />
         ) : (
           <div className="divide-y divide-slate-100 -mx-2">
             {list.map((n) => (
