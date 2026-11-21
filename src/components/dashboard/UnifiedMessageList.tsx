@@ -25,13 +25,14 @@ const EN_KEY = 'pb-chat-english';
 
 /** English text of the chat, only for the person looking at the dashboard. Saved per browser. */
 export function useEnglish(conversationId: string | undefined, messages: Message[]) {
-  const [on, setOn] = useState(false);
+  // English is on by default; "Show original" switches it off (remembered in this browser).
+  const [on, setOn] = useState(true);
   const [fetched, setFetched] = useState<En>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     try {
-      setOn(localStorage.getItem(EN_KEY) === '1');
+      setOn(localStorage.getItem(EN_KEY) !== '0');
     } catch {}
   }, []);
   const toggle = () => {
