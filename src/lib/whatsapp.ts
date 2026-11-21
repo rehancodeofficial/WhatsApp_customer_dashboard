@@ -107,7 +107,10 @@ export async function sendMetaWhatsAppMessage({
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const apiVersion = process.env.WHATSAPP_API_VERSION || 'v21.0';
-  const direct = hasDirectWhatsAppToken();
+  // Send through n8n (it holds the working WhatsApp credential). The dashboard's own Meta token is used only
+  // when WHATSAPP_DIRECT=true, or when there is no n8n bridge (a wrong token/phone ID on Vercel caused
+  // "Invalid parameter sent to Meta Graph API").
+  const direct = hasDirectWhatsAppToken() && (process.env.WHATSAPP_DIRECT === 'true' || !n8nBridgeEnabled());
 
   if (!direct && !n8nBridgeEnabled()) {
     throw new Error('WhatsApp sending is not configured (no Meta token and no n8n bridge)');
