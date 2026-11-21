@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
+import { InstallAppButton } from '@/components/InstallApp';
 import {
   Bell,
   ChevronDown,
@@ -115,6 +116,8 @@ function SidebarNav({
                     </button>
                   );
                 })}
+              {/* Right under Settings: install the dashboard as a phone / desktop app. */}
+              {g === 'Account' && <InstallAppButton collapsed={collapsed} />}
             </div>
           </div>
         ))}
