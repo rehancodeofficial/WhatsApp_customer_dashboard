@@ -256,10 +256,10 @@ function ProfileTab() {
             </Field>
           </div>
           {p?.role === 'owner' && (
-            <Field label="Recovery email (Outlook)" hint="“Forgot password?” sends a reset link here. The link works once and expires after 15 minutes.">
+            <Field label="Recovery email" hint="“Forgot password?” sends a reset link here. The link works once and expires after 15 minutes.">
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input className={inputCls + ' pl-9'} type="email" value={recovery} onChange={(e) => setRecovery(e.target.value)} placeholder="name@hotmail.com" />
+                <input className={inputCls + ' pl-9'} type="email" value={recovery} onChange={(e) => setRecovery(e.target.value)} placeholder="name@example.com" />
               </div>
             </Field>
           )}
