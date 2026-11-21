@@ -13,12 +13,12 @@ export async function alertOwnerNewMessage(opts: { origin: string; waId: string;
   const since = new Date(Date.now() - 2 * 60_000).toISOString();
   const { data: recent } = await db.from('notifications').select('id').eq('wa_id', opts.waId).eq('type', 'handoff').gte('created_at', since).limit(1);
   if (recent?.length) return;
-  const who = `${opts.name || 'Customer'} (+${opts.waId})`;
+  const customerName = opts.name || 'Customer';
   const link = chatLink(opts.origin, opts.waId);
   const preview = opts.text.length > 400 ? opts.text.slice(0, 400) + '…' : opts.text;
-  const body = `${who} wrote while you are handling the chat (AI paused):\n\n${preview}\n\nReply in the dashboard (translated automatically): ${link}`;
-  await db.from('notifications').insert({ type: 'handoff', title: `New message: ${opts.name || '+' + opts.waId}`, body, wa_id: opts.waId, party: opts.party || 'customer', order_no: null, request_code: null, read_at: null });
+  const body = `New msg from ${customerName}\n${link}`;
+  await db.from('notifications').insert({ type: 'handoff', title: `New msg from ${customerName}`, body, wa_id: opts.waId, party: opts.party || 'customer', order_no: null, request_code: null, read_at: null });
   if (OWNER_WHATSAPP_NUMBER && canSendRealWhatsApp()) {
-    await sendMetaWhatsAppMessage({ to: OWNER_WHATSAPP_NUMBER, type: 'text', text: `💬 ${body}` }).catch((e) => console.error('owner chat alert failed', e?.message || e));
+    await sendMetaWhatsAppMessage({ to: OWNER_WHATSAPP_NUMBER, type: 'text', text: body }).catch((e) => console.error('owner chat alert failed', e?.message || e));
   }
 }

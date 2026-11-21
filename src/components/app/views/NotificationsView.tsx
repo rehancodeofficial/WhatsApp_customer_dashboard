@@ -66,7 +66,7 @@ export function NotificationBell({ data, onOpen, onSeeAll, markRead }: { data: {
         {unread > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">{unread > 99 ? '99+' : unread}</span>}
       </button>
       {open && (
-        <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto sm:right-0 top-16 sm:top-auto sm:mt-2 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-xl z-40 overflow-hidden">
+        <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto sm:right-0 top-16 sm:top-auto sm:mt-2 sm:w-[480px] md:w-[540px] bg-white rounded-2xl border border-slate-200 shadow-xl z-40 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <span className="text-sm font-semibold text-slate-800">Notifications</span>
             <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export function NotificationModal({ n, onClose, onOpenChat, onOpenOrders }: { n:
   if (!n) return null;
   const party = n.party === 'supplier' ? 'supplier' : 'customer';
   return (
-    <Modal open onClose={onClose} title={n.title}>
+    <Modal open onClose={onClose} title={n.title} wide>
       <div className="space-y-4">
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <TypeDot type={n.type} />

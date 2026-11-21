@@ -3,12 +3,11 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import type { AIModeEvent, Message } from '@/lib/types';
 import { formatTime } from '@/lib/utils';
-import { AlertCircle, Bot, Check, CheckCheck, Download, FileText, Hand, MessageSquare } from 'lucide-react';
+import { AlertCircle, Bot, Check, CheckCheck, Download, FileText, Hand, MessageSquare, User } from 'lucide-react';
 
-// View-only WhatsApp-style chat. Shows ONLY the customer's (or supplier's) messages and the AI's
-// replies. When the AI was paused, the owner talked to the customer from his own WhatsApp, so that
-// period is shown as one "Manual" marker and its messages are left out. The chat continues
-// normally from the moment the AI is back.
+// View-only WhatsApp-style chat. Shows customer/supplier messages, AI replies, and owner/staff replies.
+// When the AI was paused (manual period), owner/staff messages and customer replies are all displayed
+// chronologically, along with an indicator for the manual handling period.
 
 interface Props {
   messages: Message[];
@@ -21,7 +20,7 @@ interface Props {
 
 type Item =
   | { kind: 'msg'; m: Message }
-  | { kind: 'manual'; from: string; to: string | null; hidden: number }
+  | { kind: 'manual'; from: string; to: string | null }
   | { kind: 'day'; label: string };
 
 function manualWindows(events: AIModeEvent[], currentMode?: string) {
@@ -46,11 +45,10 @@ export function UnifiedMessageList({ messages, events = [], currentMode, party =
 
   const items = useMemo<Item[]>(() => {
     const windows = manualWindows(events, currentMode);
-    const inWindow = (t: string) => windows.find((w) => t >= w.from && (w.to === null || t < w.to));
-    // Only the customer / supplier and the AI. Owner, staff and system messages are never shown.
-    const visible = messages.filter((m) => m.direction === 'inbound' || m.sender_type === 'ai');
+    // Show all customer/supplier messages and outbound messages (AI or owner/agent)
+    const visible = [...messages].sort((a, b) => a.created_at.localeCompare(b.created_at));
     const list: Item[] = [];
-    const shownWindows = new Map<string, Extract<Item, { kind: 'manual' }>>();
+    const shownWindows = new Set<string>();
     let lastDay = '';
     const pushDay = (iso: string) => {
       const d = new Date(iso).toDateString();
@@ -59,31 +57,37 @@ export function UnifiedMessageList({ messages, events = [], currentMode, party =
         list.push({ kind: 'day', label: new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) });
       }
     };
+
+    // Insert manual window markers and messages in chronological order
+    const markers = windows.map((w) => ({ kind: 'manual' as const, from: w.from, to: w.to }));
+    let markerIdx = 0;
+
     for (const m of visible) {
-      const w = m.sender_type === 'ai' ? null : inWindow(m.created_at);
-      if (w) {
-        const key = w.from;
-        let marker = shownWindows.get(key);
-        if (!marker) {
-          pushDay(w.from);
-          marker = { kind: 'manual', from: w.from, to: w.to, hidden: 0 };
-          shownWindows.set(key, marker);
+      // While there are markers that happened before or at this message's timestamp
+      while (markerIdx < markers.length && markers[markerIdx].from <= m.created_at) {
+        const marker = markers[markerIdx];
+        if (!shownWindows.has(marker.from)) {
+          pushDay(marker.from);
           list.push(marker);
+          shownWindows.add(marker.from);
         }
-        marker.hidden++;
-        continue;
+        markerIdx++;
       }
       pushDay(m.created_at);
       list.push({ kind: 'msg', m });
     }
-    // Manual periods without any customer message still get their marker (in time order).
-    for (const w of windows) {
-      if (shownWindows.has(w.from)) continue;
-      const marker: Item = { kind: 'manual', from: w.from, to: w.to, hidden: 0 };
-      const idx = list.findIndex((it) => it.kind === 'msg' && it.m.created_at > w.from);
-      if (idx === -1) list.push(marker);
-      else list.splice(idx, 0, marker);
+
+    // Remaining markers after all messages
+    while (markerIdx < markers.length) {
+      const marker = markers[markerIdx];
+      if (!shownWindows.has(marker.from)) {
+        pushDay(marker.from);
+        list.push(marker);
+        shownWindows.add(marker.from);
+      }
+      markerIdx++;
     }
+
     return list;
   }, [messages, events, currentMode]);
 
@@ -125,7 +129,6 @@ export function UnifiedMessageList({ messages, events = [], currentMode, party =
                   </span>{' '}
                   · AI paused at {formatTime(it.from)}, owner handled this chat on WhatsApp
                   {it.to ? ` until ${formatTime(it.to)}` : ''}.
-                  {it.hidden > 0 && ` ${it.hidden} message${it.hidden === 1 ? '' : 's'} from this period not shown.`}
                   {it.to && <span className="block mt-0.5 font-semibold text-orange-700">AI is back from here</span>}
                 </div>
               </div>
@@ -133,15 +136,34 @@ export function UnifiedMessageList({ messages, events = [], currentMode, party =
           }
           const m = it.m;
           const inbound = m.direction === 'inbound';
+          const isOwner = !inbound && m.sender_type !== 'ai';
           return (
             <div key={m.id} className={`flex ${inbound ? 'justify-start' : 'justify-end'}`}>
               <div
                 className={`relative max-w-[85%] sm:max-w-[70%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed shadow-sm ${
-                  inbound ? 'bg-white text-slate-800 rounded-tl-sm' : 'bg-orange-100 text-slate-900 rounded-tr-sm'
+                  inbound
+                    ? 'bg-white text-slate-800 rounded-tl-sm'
+                    : isOwner
+                    ? 'bg-amber-100 text-slate-900 rounded-tr-sm border border-amber-200/60'
+                    : 'bg-orange-100 text-slate-900 rounded-tr-sm'
                 }`}
               >
-                <div className={`flex items-center gap-1 text-[10px] font-semibold mb-0.5 ${inbound ? 'text-slate-500' : 'text-orange-700'}`}>
-                  {inbound ? who : (<><Bot className="w-3 h-3" /> AI</>)}
+                <div
+                  className={`flex items-center gap-1 text-[10px] font-semibold mb-0.5 ${
+                    inbound ? 'text-slate-500' : isOwner ? 'text-amber-800' : 'text-orange-700'
+                  }`}
+                >
+                  {inbound ? (
+                    who
+                  ) : isOwner ? (
+                    <>
+                      <User className="w-3 h-3" /> Owner
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="w-3 h-3" /> AI
+                    </>
+                  )}
                 </div>
                 {m.type === 'image' && m.media_url && <img src={m.media_url} alt="" className="mb-1.5 rounded-lg max-h-64 w-auto" />}
                 {m.type === 'audio' && m.media_url && <audio controls src={m.media_url} className="mb-1.5 h-8 w-56 max-w-full" />}
