@@ -1,36 +1,30 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Send, FileText, Paperclip, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { Send, FileText, AlertTriangle, Languages, Loader2 } from 'lucide-react';
 import { get24HourWindowStatus } from '@/lib/whatsapp';
 
 interface UnifiedMessageComposerProps {
   conversationId: string;
   channel?: 'whatsapp' | 'email';
   lastCustomerMessageAt: string | null;
+  /** Customer's language: the owner's text is translated into it before sending. */
+  language?: string | null;
   onSendMessage: (payload: {
     type: 'text' | 'template';
     body?: string;
     templateName?: string;
     subject?: string;
+    translate?: boolean;
   }) => Promise<void>;
 }
 
+// Templates approved in the Phone Buzz WhatsApp account (no variables).
 const APPROVED_TEMPLATES = [
   {
-    name: 'order_status_update',
-    label: 'Order Status Update',
-    description: 'Hello {{1}}, here is the current status update for your wholesale phone consignment.',
-  },
-  {
-    name: 'price_quotation_followup',
-    label: 'Price Quotation Followup',
-    description: 'Hi {{1}}, we have refreshed stock quotes for mobile phones in our Dubai warehouse.',
-  },
-  {
-    name: 'customer_reengagement',
-    label: 'Customer Re-engagement',
-    description: 'Hello! Are you still interested in placing your wholesale device order with PhoneBuzz?',
+    name: 'phonebuzz_intro',
+    label: 'Phone Buzz introduction',
+    description: 'Hello! This is the Phone Buzz FZCO sales assistant… please reply with the model, quantity, storage, grade, color and delivery country you need.',
   },
 ];
 
@@ -38,9 +32,14 @@ export function UnifiedMessageComposer({
   conversationId,
   channel = 'whatsapp',
   lastCustomerMessageAt,
+  language,
   onSendMessage,
 }: UnifiedMessageComposerProps) {
   const [text, setText] = useState('');
+  const lang = String(language || '').replace(/\s*\(auto\)\s*/gi, '').trim() || 'English';
+  const needsTranslation = !/^(english|en)$/i.test(lang);
+  const [translate, setTranslate] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [subject, setSubject] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
@@ -58,14 +57,18 @@ export function UnifiedMessageComposer({
     }
 
     setIsSending(true);
+    setError(null);
     try {
       await onSendMessage({
         type: 'text',
         body: text.trim(),
         subject: isEmail ? subject.trim() || 'Re: PhoneBuzz Inquiry' : undefined,
+        translate: needsTranslation && translate,
       });
       setText('');
       setSubject('');
+    } catch (e: any) {
+      setError(e?.message || 'Could not send the message');
     } finally {
       setIsSending(false);
     }
@@ -74,11 +77,14 @@ export function UnifiedMessageComposer({
   const handleSendTemplate = async (templateName: string) => {
     setIsSending(true);
     setShowTemplatePicker(false);
+    setError(null);
     try {
       await onSendMessage({
         type: 'template',
         templateName,
       });
+    } catch (e: any) {
+      setError(e?.message || 'Could not send the template');
     } finally {
       setIsSending(false);
     }
@@ -157,6 +163,17 @@ export function UnifiedMessageComposer({
         </div>
       )}
 
+      {error && <div className="mb-2 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700">{error}</div>}
+
+      {/* Translation: the owner writes in his language, the customer reads theirs. */}
+      {!isEmail && needsTranslation && (
+        <label className="mb-2 flex items-center gap-2 text-[11px] text-slate-600 cursor-pointer select-none w-fit">
+          <input type="checkbox" checked={translate} onChange={(e) => setTranslate(e.target.checked)} className="w-3.5 h-3.5 accent-orange-500" />
+          <Languages className="w-3.5 h-3.5 text-orange-600" />
+          {translate ? <>Translated to <b className="text-slate-800">{lang}</b> before sending</> : <>Send exactly as typed (no translation)</>}
+        </label>
+      )}
+
       {/* Composer Input Area */}
       <form onSubmit={handleSend} className="flex items-end space-x-2">
         {!isEmail && (
@@ -185,7 +202,9 @@ export function UnifiedMessageComposer({
               isEmail
                 ? 'Compose reply email to customer (Shift+Enter for newline, Enter to send)...'
                 : windowStatus.isOpen
-                ? 'Type WhatsApp reply (Enter to send)...'
+                ? needsTranslation && translate
+                  ? `Write in any language, it goes out in ${lang} (Enter to send)…`
+                  : 'Type WhatsApp reply (Enter to send)...'
                 : '24h window closed — click Template icon to re-engage customer'
             }
             className="w-full bg-transparent border-none outline-none resize-none text-xs text-slate-900 placeholder-slate-400 max-h-32"
@@ -200,7 +219,7 @@ export function UnifiedMessageComposer({
           }`}
           title="Send message"
         >
-          <Send className="w-4 h-4" />
+          {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
       </form>
     </div>

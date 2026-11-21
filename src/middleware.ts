@@ -26,7 +26,8 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.search = pathname === '/' || pathname === '/dashboard' ? '' : `?next=${encodeURIComponent(pathname)}`;
+    const back = pathname + request.nextUrl.search; // e.g. /dashboard?chat=923… (link from an owner alert)
+    url.search = pathname === '/' || (pathname === '/dashboard' && !request.nextUrl.search) ? '' : `?next=${encodeURIComponent(back)}`;
     return NextResponse.redirect(url);
   };
   const redirectToDashboard = () => {

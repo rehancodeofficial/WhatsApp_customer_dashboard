@@ -71,6 +71,8 @@ export const SendMessageSchema = z.object({
   body: z.string().max(4096).optional().nullable(),
   template_name: z.string().regex(/^[a-z0-9_]+$/).optional().nullable(),
   template_language: z.string().optional().default('en'),
+  /** Translate the owner's text into the customer's language before sending (default on). */
+  translate: z.boolean().optional().default(true),
 });
 
 export const SetModeSchema = z.object({

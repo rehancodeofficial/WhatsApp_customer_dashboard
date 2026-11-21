@@ -16,6 +16,7 @@ import { TeamView } from '@/components/app/views/TeamView';
 import { NotificationBell, NotificationModal, NotificationsView, useNotifications, type NotificationRow } from '@/components/app/views/NotificationsView';
 import { UnifiedChatList } from '@/components/dashboard/UnifiedChatList';
 import { UnifiedChatHeader } from '@/components/dashboard/UnifiedChatHeader';
+import { UnifiedMessageComposer } from '@/components/dashboard/UnifiedMessageComposer';
 import { UnifiedMessageList } from '@/components/dashboard/UnifiedMessageList';
 import { UnifiedCustomerPanel } from '@/components/dashboard/UnifiedCustomerPanel';
 import { SettingsView } from '@/components/dashboard/SettingsView';
@@ -172,6 +173,24 @@ export default function DashboardPage() {
     setOpenNotification(null);
   }, []);
 
+  // Link from an owner alert: /dashboard?chat=923001234567 opens that chat (customer or supplier).
+  const deepLinkDone = useRef(false);
+  useEffect(() => {
+    if (deepLinkDone.current || !me || !conversations.length) return;
+    const wa = new URLSearchParams(window.location.search).get('chat');
+    if (!wa) {
+      deepLinkDone.current = true;
+      return;
+    }
+    const digits = wa.replace(/[^0-9]/g, '');
+    const c = conversations.find((x) => String(x.contact?.wa_id || '') === digits);
+    if (c) {
+      deepLinkDone.current = true;
+      openChat(c.id, partyOf(c));
+      window.history.replaceState(null, '', '/dashboard');
+    }
+  }, [me, conversations, openChat]);
+
   const openNotificationRow = (n: NotificationRow) => {
     setOpenNotification(n);
     if (!n.read_at) notif.markRead([n.id]);
@@ -221,18 +240,42 @@ export default function DashboardPage() {
             </div>
             <UnifiedChatHeader
               conversation={selected}
-              onModeChange={async () => {}}
-              canToggleAi={false}
+              onModeChange={async (mode, resumeMinutes) => {
+                await api(`/api/conversations/${selected.id}/mode`, { method: 'POST', body: JSON.stringify({ mode, resume_in_minutes: resumeMinutes ?? null }) });
+                await loadConversations();
+                await loadDetail(selected.id, false);
+              }}
+              canToggleAi={perms.has('ai.toggle')}
               isPanelOpen={panelOpen}
               onTogglePanel={chatParty === 'customer' ? () => setPanelOpen(!panelOpen) : undefined}
             />
             <UnifiedMessageList messages={messages} events={modeEvents} currentMode={selected.mode} party={chatParty} />
-            <div className="px-4 py-2.5 text-[11px] text-slate-500 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-              <span>View only. Replies happen on WhatsApp: the AI answers, or the owner from his own phone.</span>
-              <a href={`https://wa.me/${selected.contact?.wa_id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline">
-                <ExternalLink className="w-3.5 h-3.5" /> Open in WhatsApp
-              </a>
-            </div>
+            {perms.has('chats.reply') && selected.channel !== 'email' ? (
+              // The owner replies here: translated to the customer's language, sent from the business
+              // number, and the chat goes to "human" (AI paused) until he presses Resume AI.
+              <UnifiedMessageComposer
+                key={selected.id}
+                conversationId={selected.id}
+                channel="whatsapp"
+                lastCustomerMessageAt={selected.last_customer_message_at}
+                language={selected.contact?.preferred_language}
+                onSendMessage={async (p) => {
+                  await api('/api/messages/send', {
+                    method: 'POST',
+                    body: JSON.stringify({ conversation_id: selected.id, type: p.type, body: p.body, template_name: p.templateName, translate: p.translate ?? false }),
+                  });
+                  await loadDetail(selected.id, false);
+                  await loadConversations();
+                }}
+              />
+            ) : (
+              <div className="px-4 py-2.5 text-[11px] text-slate-500 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <span>View only. Replies happen on WhatsApp: the AI answers, or the Admin replies here.</span>
+                <a href={`https://wa.me/${selected.contact?.wa_id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline">
+                  <ExternalLink className="w-3.5 h-3.5" /> Open in WhatsApp
+                </a>
+              </div>
+            )}
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">

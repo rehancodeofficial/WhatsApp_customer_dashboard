@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { InboundMessageSchema } from '@/lib/validations';
 import { checkN8nSecret } from '@/lib/config';
 import { getRepo } from '@/lib/repo';
+import { alertOwnerNewMessage } from '@/lib/owner-chat-alert';
 
 // Called by n8n for every customer WhatsApp message.
 // Returns { ai_enabled, mode } so the n8n IF node decides whether the AI may reply.
@@ -16,6 +17,16 @@ export async function POST(req: NextRequest) {
   }
   try {
     const result = await getRepo().ingestInbound(parsed.data);
+    // Owner is handling this chat: AI stays silent, so tell the owner (with a link to the dashboard chat).
+    if (result.mode === 'human' && !(result as any).duplicate) {
+      await alertOwnerNewMessage({
+        origin: req.nextUrl.origin,
+        waId: parsed.data.wa_id,
+        name: parsed.data.name || parsed.data.profile_name,
+        party: parsed.data.party ?? 'customer',
+        text: parsed.data.body || parsed.data.transcript_or_caption || `[${parsed.data.type}]`,
+      }).catch((e) => console.error('owner alert failed', e));
+    }
     return NextResponse.json({ success: true, ...result });
   } catch (err: any) {
     console.error('inbound failed', err);

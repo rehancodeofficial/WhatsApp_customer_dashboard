@@ -7,6 +7,7 @@ import { getRepo } from '@/lib/repo';
 import { agentMemoryText } from '@/lib/memory-format';
 import { rateLimit } from '@/lib/rate-limit';
 import { logActivity } from '@/lib/security';
+import { translateForCustomer } from '@/lib/n8n-bridge';
 
 // The owner / agent replies to a customer from the dashboard.
 export async function POST(req: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
-  const { conversation_id, type, body, template_name, template_language } = parsed.data;
+  const { conversation_id, type, body, template_name, template_language, translate } = parsed.data;
   if (type === 'text' && !body?.trim()) return NextResponse.json({ error: 'Message is empty' }, { status: 400 });
   if (type === 'template' && !template_name) return NextResponse.json({ error: 'Template name is required' }, { status: 400 });
 
@@ -39,6 +40,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Owner writes in his language; the customer gets it in theirs (n8n Gemini).
+  let outText = body?.trim() || '';
+  let translation: { language: string; translated: boolean } | null = null;
+  if (type === 'text' && translate && !isDemoMode()) {
+    try {
+      const t = await translateForCustomer(outText, conv.contact?.preferred_language);
+      outText = t.text;
+      translation = { language: t.language, translated: t.translated };
+    } catch (err: any) {
+      return NextResponse.json({ error: `${err.message || 'Translation failed'}. Try again, or turn translation off to send your text as it is.` }, { status: 502 });
+    }
+  }
+
   let waMessageId: string;
   let raw: Record<string, unknown> = {};
   if (canSendRealWhatsApp()) {
@@ -46,7 +60,7 @@ export async function POST(req: NextRequest) {
       const res = await sendMetaWhatsAppMessage({
         to: wa_id,
         type,
-        text: body || undefined,
+        text: outText || undefined,
         templateName: template_name || undefined,
         templateLanguage: template_language || 'en',
       });
@@ -62,12 +76,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'WhatsApp is not configured (WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID)' }, { status: 500 });
   }
 
-  // Replying personally takes the chat over, so the AI does not answer the customer's next message.
-  if (conv.mode === 'ai') {
-    await repo.setMode(conv.id, 'human', viewer.id, 'Owner replied personally, AI paused automatically', null);
+  // Replying personally takes the chat over: the AI stays silent (also no handoff auto-replies)
+  // until the owner presses "Resume AI" (or sends PAYMENT VERIFIED on WhatsApp).
+  if (conv.mode !== 'human') {
+    await repo.setMode(conv.id, 'human', viewer.id, 'Owner replied from the dashboard, AI paused until resumed', null);
   }
 
-  const text = type === 'template' ? `[Template: ${template_name}]` : body!.trim();
+  const text = type === 'template' ? `[Template: ${template_name}]` : outText;
+  if (translation?.translated) raw = { ...raw, original_text: body!.trim(), translated_to: translation.language };
   const message = await repo.logOutbound({
     wa_id,
     wa_message_id: waMessageId,
@@ -83,5 +99,5 @@ export async function POST(req: NextRequest) {
   await repo.appendMemory(wa_id, 'ai', agentMemoryText(text));
 
   await logActivity(viewer, 'chat.message_sent', { conversation_id, type, preview: String(text).slice(0, 120) });
-  return NextResponse.json({ success: true, message });
+  return NextResponse.json({ success: true, message, translation });
 }
