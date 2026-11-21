@@ -236,3 +236,25 @@ Auth, On Error: Continue, JSON body:
 3. Reply from the dashboard → it arrives on your phone.
 4. Press the button again (Resume) → message again → the AI replies and knows what you wrote in step 3.
 5. A second phone number stays on AI the whole time.
+
+## 2026-11-21 — stock checks, supplier requests, owner commands (n8n workflow 7MPxJwkHimVSILg1)
+
+**AI sales agent**
+- *Live Stock Check* + *Stock Summary* run before every AI reply: the customer's saved product is checked against `/api/n8n/sheet/Inventory?model=&storage=&grade=&color=` (exact matches only; no match = "NOT IN STOCK" note).
+- *Inventory* tool sends `model/brand/storage/grade/color` (`$fromAI`) plus the customer currency, so prices come back already converted (`Customer_Price_Per_Piece`).
+- *Stock Guard* (after the AI, before *Prepare Lead Record*): a reply that prices or confirms a product that is not in stock is replaced, the price removed and a supplier request raised. Handoff is blocked for out-of-stock products.
+- Out of stock: the AI never says "not available"; it collects all order details, then says "your order details are with our sales team" and sets `supplier_request`.
+- Grades are A+ (brand new), A, B, C. Replies are short, details asked as bullet lines. First reply = short welcome, no grades/MOQ.
+- All Gemini nodes rotate only between `gemini-3.5-flash-lite` and `gemini-3.1-flash-lite` (replies ~20 s instead of minutes). Memory key now `-v25`.
+
+**Suppliers**
+- Supplier matching understands brand aliases (iPhone → Apple, Galaxy → Samsung, …) and takes the brand from the model when empty; brand + country first, brand only as fallback.
+- *Ask Supplier (Template)* sends the approved template `phonebuzz_supplier_request` (body vars: brand, model, storage, color, quantity) so suppliers outside the 24-hour window get it; falls back to the text message. **The template must be created and approved in WhatsApp Manager.**
+- Request ID removed from every message sent to suppliers (owner alerts keep it). Supplier-message alert to the owner is 4 lines.
+
+**Owner WhatsApp commands**
+- `STOCK …` / `add inventory …` → *Read Owner Stock* (Gemini) → `/api/n8n/inventory-add` (next INV-xxxx, same product adds quantity). `naya supplier add karo …` → *Understand New Supplier* (Gemini) → existing supplier flow.
+- Missing details are asked back; *Owner Reply Context* keeps the unfinished message 60 min (`ownerDraft`) and *Continue Owner Draft* merges the owner's next reply. `cancel` drops it.
+- `Customer: 92300…` always opens the chat with the `phonebuzz_intro` template.
+
+**Dashboard bridge actions** (`/webhook/phonebuzz-dashboard`): `payment_verified`, `supplier_delivered`, `to_english` added.
