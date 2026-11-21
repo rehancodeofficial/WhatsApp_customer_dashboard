@@ -13,6 +13,27 @@ import { watchInventory } from '@/lib/biz/inventory-sync';
 // Answers with a JSON array of rows (n8n turns it into one item per row).
 //
 // GET /api/n8n/sheet/<Tab>  → every row (used by the AI agent's tools: Inventory, FAQ, ...).
+/**
+ * Inventory for the AI: ?currency=PKR&rate=276.46&decimals=0 (sent by n8n once the delivery country is known)
+ * adds the price per piece already converted, so the AI never multiplies exchange rates itself.
+ * Sale_Price stays in USD (the inventory currency).
+ */
+function withCustomerPrice(rows: Record<string, unknown>[], q: URLSearchParams) {
+  const currency = String(q.get('currency') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+  const rate = Number(q.get('rate'));
+  const decimals = Math.min(2, Math.max(0, Number(q.get('decimals') ?? 2) || 0));
+  return rows.map((r) => {
+    const usd = Number(String(r.Sale_Price ?? '').replace(/[^0-9.]/g, ''));
+    const out: Record<string, unknown> = { ...r, Sale_Price_Currency: 'USD' };
+    if (currency && rate > 0 && usd > 0) {
+      const f = 10 ** decimals;
+      out.Customer_Currency = currency;
+      out.Customer_Price_Per_Piece = Math.round(usd * rate * f) / f;
+    }
+    return out;
+  });
+}
+
 const truthy = (v: unknown) => v === true || v === 'true' || v === 1 || v === '1';
 
 function auth(req: NextRequest) {
@@ -26,7 +47,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shee
   try {
     const rows = await readRows(tab);
     // The AI tools only need the content, not internal row numbers.
-    return NextResponse.json(rows.map(({ row_number, ...r }) => r));
+    const clean = rows.map(({ row_number, ...r }) => r);
+    if (tab === 'Inventory') return NextResponse.json(withCustomerPrice(clean, req.nextUrl.searchParams));
+    return NextResponse.json(clean);
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
