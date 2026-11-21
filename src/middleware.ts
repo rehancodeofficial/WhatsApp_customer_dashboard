@@ -13,7 +13,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/n8n/') ||
     pathname.startsWith('/api/cron/') ||
     pathname.startsWith('/api/health') ||
-    pathname.startsWith('/api/auth/')
+    pathname.startsWith('/api/auth/') ||
+    // installable-app files must load without signing in
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/sw.js' ||
+    pathname === '/offline.html'
   ) {
     return NextResponse.next();
   }
