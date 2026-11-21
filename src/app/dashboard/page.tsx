@@ -46,16 +46,42 @@ const partyOf = (c: Conversation): Party => (c.contact?.kind === 'supplier' ? 's
 export default function DashboardPage() {
   const { supabase } = useSupabase();
   const [me, setMe] = useState<MeInfo | null>(null);
-  const [section, setSection] = useState<Section | null>(null);
+  const [section, setSection] = useState<Section | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pb_dashboard_section') as Section | null;
+      if (saved) return saved;
+    }
+    return null;
+  });
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pb_dashboard_chat_id');
+    }
+    return null;
+  });
   const [messages, setMessages] = useState<Message[]>([]);
   const [modeEvents, setModeEvents] = useState<AIModeEvent[]>([]);
   const [panelOpen, setPanelOpen] = useState(true);
   const [openNotification, setOpenNotification] = useState<NotificationRow | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Sync active section to localStorage so refresh keeps you on the same page
+  useEffect(() => {
+    if (section && typeof window !== 'undefined') {
+      localStorage.setItem('pb_dashboard_section', section);
+    }
+  }, [section]);
+
+  // Sync selected chat to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (selectedId) localStorage.setItem('pb_dashboard_chat_id', selectedId);
+      else localStorage.removeItem('pb_dashboard_chat_id');
+    }
+  }, [selectedId]);
 
   // Prevent accidental back navigation from reopening login or exiting silently.
   // When user clicks the browser Back button, intercept it and show the in-app Logout confirmation modal.
@@ -162,7 +188,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!me) return;
     const ids = allowedSections(new Set(me.permissions)).map((s) => s.id);
-    setSection((cur) => (cur && ids.includes(cur) ? cur : ids[0] ?? null));
+    const saved = typeof window !== 'undefined' ? (localStorage.getItem('pb_dashboard_section') as Section | null) : null;
+    setSection((cur) => {
+      if (cur && ids.includes(cur)) return cur;
+      if (saved && ids.includes(saved)) return saved;
+      return ids[0] ?? null;
+    });
   }, [me]);
 
   const signOut = async () => {
