@@ -14,11 +14,12 @@ export const PERMISSION_GROUPS = [
     items: [{ key: 'stats.view', label: 'Sales analytics', hint: 'Revenue, orders and top products charts' }],
   },
   {
-    group: 'Chats (view only)',
+    group: 'Chats',
     items: [
       { key: 'chats.view', label: 'Customer chats', hint: 'Read customer ↔ AI WhatsApp chats' },
       { key: 'supplier_chats.view', label: 'Supplier chats', hint: 'Read supplier ↔ AI WhatsApp chats' },
       { key: 'chats.organize', label: 'Organize chats', hint: 'Star and archive chats' },
+      { key: 'chats.actions', label: 'Verify Payment, Delivered & Pause AI', hint: 'Verify payment, order delivered, and pause/resume AI' },
     ],
   },
   {
@@ -72,6 +73,9 @@ export const ALL_PERMISSIONS: Permission[] = [...GRANTABLE_PERMISSIONS, ...ADMIN
 /** The permissions the old fixed "Management" role had. Used as the default role. */
 export const MANAGEMENT_DEFAULT: GrantablePermission[] = ['chats.view', 'supplier_chats.view', 'chats.organize', 'customers.view', 'notifications.view'];
 
+/** Default permissions for the Salesman role. */
+export const SALESMAN_DEFAULT: GrantablePermission[] = ['chats.view', 'chats.actions', 'customers.view', 'orders.view', 'notifications.view'];
+
 export interface Access {
   role: Role;
   permissions?: readonly string[] | null;
@@ -86,6 +90,7 @@ export function sanitizePermissions(list: readonly string[] | null | undefined):
 export function can(access: Access | null | undefined, p: Permission): boolean {
   if (!access) return false;
   if (access.role === 'owner') return true;
+  if (p === 'ai.toggle' && sanitizePermissions(access.permissions).includes('chats.actions')) return true;
   if ((ADMIN_ONLY_PERMISSIONS as string[]).includes(p)) return false;
   return sanitizePermissions(access.permissions).includes(p as GrantablePermission);
 }

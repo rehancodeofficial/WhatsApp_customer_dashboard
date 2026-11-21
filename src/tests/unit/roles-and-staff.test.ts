@@ -31,6 +31,11 @@ describe('role-based permissions', () => {
     expect(can(mgmt, 'inventory.view')).toBe(false);
     expect(can(mgmt, 'broadcast.send')).toBe(false);
   });
+  it('salesman role with chats.actions can perform chat action buttons (ai.toggle)', () => {
+    const salesman = { role: 'agent' as const, permissions: ['chats.view', 'chats.actions'] };
+    expect(can(salesman, 'chats.actions')).toBe(true);
+    expect(can(salesman, 'ai.toggle')).toBe(true);
+  });
   it('admin-only permissions can never be granted to a role', () => {
     const sneaky = { role: 'agent' as const, permissions: ['staff.manage', 'settings.view', 'chats.view'] };
     expect(can(sneaky, 'staff.manage')).toBe(false);

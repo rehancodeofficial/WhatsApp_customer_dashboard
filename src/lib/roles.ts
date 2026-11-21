@@ -3,7 +3,7 @@
 import { randomUUID } from 'crypto';
 import { isDemoMode } from '@/lib/config';
 import { getAdminSupabase } from '@/lib/supabase/admin';
-import { MANAGEMENT_DEFAULT, sanitizePermissions, type GrantablePermission } from '@/lib/permissions';
+import { MANAGEMENT_DEFAULT, SALESMAN_DEFAULT, sanitizePermissions, type GrantablePermission } from '@/lib/permissions';
 
 export interface StaffRole {
   id: string;
@@ -27,6 +27,7 @@ function demoRoles(): StaffRole[] {
     const now = new Date().toISOString();
     g.__pbDemoRoles = [
       { id: DEMO_MANAGEMENT_ROLE_ID, name: 'Management', description: 'Works the inbox: reads chats, replies, AI on/off', permissions: [...MANAGEMENT_DEFAULT], created_at: now },
+      { id: randomUUID(), name: 'Salesman', description: 'Handles sales, customer delivery, verifies payments & manages AI pause', permissions: [...SALESMAN_DEFAULT], created_at: now },
       { id: randomUUID(), name: 'Viewer', description: 'Read-only: chat logs and records', permissions: ['chats.view', 'customers.view', 'inventory.view', 'orders.view', 'suppliers.view'], created_at: now },
       { id: randomUUID(), name: 'Inventory Clerk', description: 'Keeps stock and supplier records up to date', permissions: ['inventory.view', 'inventory.manage', 'suppliers.view', 'suppliers.manage', 'orders.view'], created_at: now },
     ];
