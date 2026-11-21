@@ -258,3 +258,4 @@ Auth, On Error: Continue, JSON body:
 - `Customer: 92300…` always opens the chat with the `phonebuzz_intro` template.
 
 **Dashboard bridge actions** (`/webhook/phonebuzz-dashboard`): `payment_verified`, `supplier_delivered`, `to_english` added.
+- Supplier choice: the owner replies with the list number or a short supplier code plus quantity (`1, 50 pieces`, `2 50`, `Sup 001 50`, `sup1 50`); *Read Owner Selection* turns `Sup 001` into `SUP-001`. Supplier offers arrive as a short numbered list (*Build Quote Summary*).
