@@ -1,5 +1,6 @@
 // In-memory store used in DEMO MODE only (no Supabase configured).
 // Lives on globalThis so it survives Next.js hot reloads; resets when the server restarts.
+import { channelOf } from '@/lib/biz/channel';
 import { randomUUID } from 'crypto';
 import type { AIModeEvent, Contact, Conversation, ConversationMode, Message } from '@/lib/types';
 import { buildMemoryMessage, customerMemoryText } from '@/lib/memory-format';
@@ -264,14 +265,14 @@ export class MemoryRepo implements Repo {
 
     let c = s.conversations.find((x) => x.contact_id === contact!.id);
     if (!c) {
-      c = { id: randomUUID(), contact_id: contact.id, channel: 'whatsapp', ai_enabled: true, mode: 'ai', paused_by: null, paused_at: null, resume_at: null, assigned_to: null, last_message_at: nowIso, last_customer_message_at: nowIso, unread_count: 0, last_message_preview: null, status: 'open', is_starred: false, is_archived: false, payment_status: 'none', created_at: nowIso };
+      c = { id: randomUUID(), contact_id: contact.id, channel: channelOf({ wa_id: input.wa_id }), ai_enabled: true, mode: 'ai', paused_by: null, paused_at: null, resume_at: null, assigned_to: null, last_message_at: nowIso, last_customer_message_at: nowIso, unread_count: 0, last_message_preview: null, status: 'open', is_starred: false, is_archived: false, payment_status: 'none', created_at: nowIso };
       s.conversations.push(c);
     }
     if (isPauseExpired(c)) await this.setMode(c.id, 'ai', null, 'Timed pause ended, AI resumed automatically', null);
 
     const duplicate = s.messages.some((m) => m.wa_message_id === input.wa_message_id);
     if (!duplicate) {
-      s.messages.push({ id: randomUUID(), conversation_id: c.id, channel: 'whatsapp', wa_message_id: input.wa_message_id, direction: 'inbound', sender_type: 'customer', sender_user_id: null, type: input.type, body: input.body ?? null, media_url: input.media_url || null, media_mime: input.media_mime || null, transcript_or_caption: input.transcript_or_caption || null, status: 'delivered', error_code: null, error_message: null, raw: input.raw ?? {}, created_at: nowIso });
+      s.messages.push({ id: randomUUID(), conversation_id: c.id, channel: channelOf({ wa_id: input.wa_id }), wa_message_id: input.wa_message_id, direction: 'inbound', sender_type: 'customer', sender_user_id: null, type: input.type, body: input.body ?? null, media_url: input.media_url || null, media_mime: input.media_mime || null, transcript_or_caption: input.transcript_or_caption || null, status: 'delivered', error_code: null, error_message: null, raw: input.raw ?? {}, created_at: nowIso });
       c.last_message_at = nowIso;
       c.last_customer_message_at = nowIso;
       c.unread_count += 1;
@@ -292,12 +293,12 @@ export class MemoryRepo implements Repo {
         contact = { id: randomUUID(), wa_id: input.wa_id, name: input.name ?? null, profile_name: null, country: null, preferred_language: 'English', lead_id: null, lead_status: null, tags: [], notes: null, kind: input.party, created_at: now };
         s.contacts.push(contact);
       }
-      c = { id: randomUUID(), contact_id: contact.id, channel: 'whatsapp', ai_enabled: true, mode: 'ai', paused_by: null, paused_at: null, resume_at: null, assigned_to: null, last_message_at: now, last_customer_message_at: null, unread_count: 0, last_message_preview: null, status: 'open', is_starred: false, is_archived: false, payment_status: 'none', created_at: now };
+      c = { id: randomUUID(), contact_id: contact.id, channel: channelOf({ wa_id: input.wa_id }), ai_enabled: true, mode: 'ai', paused_by: null, paused_at: null, resume_at: null, assigned_to: null, last_message_at: now, last_customer_message_at: null, unread_count: 0, last_message_preview: null, status: 'open', is_starred: false, is_archived: false, payment_status: 'none', created_at: now };
       s.conversations.push(c);
     }
     if (!c) throw new Error('Conversation not found for wa_id ' + input.wa_id);
     const nowIso = new Date().toISOString();
-    const m: Message = { id: randomUUID(), conversation_id: c.id, channel: 'whatsapp', wa_message_id: input.wa_message_id || null, direction: 'outbound', sender_type: input.sender_type, sender_user_id: input.sender_user_id ?? null, type: input.type, body: input.body ?? null, media_url: input.media_url || null, media_mime: input.media_mime || null, transcript_or_caption: null, status: input.status || 'sent', error_code: null, error_message: null, raw: input.raw ?? {}, created_at: nowIso };
+    const m: Message = { id: randomUUID(), conversation_id: c.id, channel: channelOf({ wa_id: input.wa_id }), wa_message_id: input.wa_message_id || null, direction: 'outbound', sender_type: input.sender_type, sender_user_id: input.sender_user_id ?? null, type: input.type, body: input.body ?? null, media_url: input.media_url || null, media_mime: input.media_mime || null, transcript_or_caption: null, status: input.status || 'sent', error_code: null, error_message: null, raw: input.raw ?? {}, created_at: nowIso };
     s.messages.push(m);
     c.last_message_at = nowIso;
     c.last_message_preview = messagePreview(input.type, input.body);

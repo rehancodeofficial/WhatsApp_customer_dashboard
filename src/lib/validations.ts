@@ -16,7 +16,12 @@ const messageType = z.preprocess(
   z.enum(MESSAGE_TYPES)
 );
 // "+971 50-123 4567" -> "971501234567"
-const waId = z.preprocess((v) => String(v ?? '').replace(/[^0-9]/g, ''), z.string().min(6).max(20));
+// A WhatsApp number (digits) or, for email-only contacts, "email:<address>".
+const waId = z.preprocess((v) => {
+  const t = String(v ?? '').trim();
+  if (/^email:/i.test(t) || t.includes('@')) return 'email:' + t.replace(/^email:/i, '').toLowerCase();
+  return t.replace(/[^0-9]/g, '');
+}, z.union([z.string().regex(/^email:[^@\s]+@[^@\s]+\.[^@\s]+$/).max(200), z.string().min(6).max(20)]));
 
 const party = z.preprocess((v) => (v === '' || v == null ? undefined : String(v).toLowerCase()), z.enum(['customer', 'supplier']).optional());
 

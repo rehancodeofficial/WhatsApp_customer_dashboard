@@ -164,10 +164,13 @@ export function UnifiedMessageComposer({
       {error && <div className="mb-2 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700">{error}</div>}
 
       {/* Translation: the owner writes in his language, the customer reads theirs. */}
-      {!isEmail && (
+      {(
         <div className="mb-2 flex items-center gap-2 text-[11px] text-slate-600 select-none w-fit">
           <Languages className="w-3.5 h-3.5 text-orange-600" />
-          <span>Always sent in <b className="text-slate-800">{lang}</b> (their language)</span>
+          <span>
+            Always sent in <b className="text-slate-800">{lang}</b> (their language)
+            {isEmail ? ' from the company email' : ''}
+          </span>
         </div>
       )}
 

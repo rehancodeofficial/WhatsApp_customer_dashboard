@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
       const raw = { source: 'n8n-chat-log', channel: channel === 'email' ? 'email' : 'whatsapp', message_type: r.Message_Type || null, request_id: r.Request_ID || null, lead_id: r.Customer_ID || null, n8n_status: r.Status || null };
       const incoming = /^(customer|supplier)/i.test(from);
       if (incoming) {
-        if (party === 'customer' && from === 'Customer' && channel !== 'email') { results.push({ ok: true, skipped: 'saved by /api/n8n/inbound' }); continue; }
+        // WhatsApp and email customer messages are saved by /api/n8n/inbound (it also returns the AI on/off mode).
+        if (party === 'customer' && from === 'Customer') { results.push({ ok: true, skipped: 'saved by /api/n8n/inbound' }); continue; }
         await repo.ingestInbound({ wa_id: wa, party, wa_message_id: id, name, type: 'text', body: text, raw });
       } else {
         await repo.logOutbound({

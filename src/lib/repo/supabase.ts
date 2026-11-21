@@ -3,6 +3,7 @@ import { getAdminSupabase } from '@/lib/supabase/admin';
 import type { Conversation, ConversationMode, Message } from '@/lib/types';
 import { buildMemoryMessage, customerMemoryText } from '@/lib/memory-format';
 import type { Repo, Viewer, ConversationFilters, InboundInput, OutboundInput, StatusInput } from './types';
+import { channelOf, EMAIL_PREFIX, isEmailOnly } from '@/lib/biz/channel';
 import { computeStats, isPauseExpired, messagePreview, pickPatch } from './logic';
 
 function flatten(row: any): Conversation {
@@ -127,6 +128,7 @@ export class SupabaseRepo implements Repo {
     if (input.lead_id) contactRow.lead_id = input.lead_id;
     if (input.lead_status) contactRow.lead_status = input.lead_status;
     if (input.party) contactRow.kind = input.party;
+    if (isEmailOnly(input.wa_id)) contactRow.email = input.wa_id.slice(EMAIL_PREFIX.length);
 
     const { data: contact, error: cErr } = await this.db
       .from('contacts')
@@ -139,7 +141,7 @@ export class SupabaseRepo implements Repo {
     if (!conv) {
       const { data: created, error } = await this.db
         .from('conversations')
-        .upsert({ contact_id: contact.id, channel: 'whatsapp', mode: 'ai', ai_enabled: true }, { onConflict: 'contact_id' })
+        .upsert({ contact_id: contact.id, channel: channelOf({ wa_id: input.wa_id }), mode: 'ai', ai_enabled: true }, { onConflict: 'contact_id' })
         .select('*')
         .single();
       if (error || !created) throw new Error('conversation create failed: ' + error?.message);
@@ -157,7 +159,7 @@ export class SupabaseRepo implements Repo {
 
     const { error: mErr } = await this.db.from('messages').insert({
       conversation_id: conv.id,
-      channel: 'whatsapp',
+      channel: channelOf({ wa_id: input.wa_id }),
       wa_message_id: input.wa_message_id,
       direction: 'inbound',
       sender_type: 'customer',
@@ -204,18 +206,18 @@ export class SupabaseRepo implements Repo {
       // e.g. the AI writes to a supplier before the supplier ever wrote to us.
       const { data: contact, error: cErr } = await this.db
         .from('contacts')
-        .upsert({ wa_id: input.wa_id, kind: input.party, ...(input.name ? { name: input.name } : {}) }, { onConflict: 'wa_id' })
+        .upsert({ wa_id: input.wa_id, kind: input.party, ...(input.name ? { name: input.name } : {}), ...(isEmailOnly(input.wa_id) ? { email: input.wa_id.slice(EMAIL_PREFIX.length) } : {}) }, { onConflict: 'wa_id' })
         .select('id')
         .single();
       if (cErr || !contact) throw new Error('contact upsert failed: ' + cErr?.message);
-      await this.db.from('conversations').upsert({ contact_id: contact.id, channel: 'whatsapp', mode: 'ai', ai_enabled: true }, { onConflict: 'contact_id' });
+      await this.db.from('conversations').upsert({ contact_id: contact.id, channel: channelOf({ wa_id: input.wa_id }), mode: 'ai', ai_enabled: true }, { onConflict: 'contact_id' });
       conv = await this.findConversationByWaId(input.wa_id);
     }
     if (!conv) throw new Error('Conversation not found for wa_id ' + input.wa_id);
     const nowIso = new Date().toISOString();
     const row = {
       conversation_id: conv.id,
-      channel: 'whatsapp',
+      channel: channelOf({ wa_id: input.wa_id }),
       wa_message_id: input.wa_message_id || null,
       direction: 'outbound',
       sender_type: input.sender_type,
