@@ -13,6 +13,7 @@ import {
   PanelRightOpen,
   CreditCard,
   Lock,
+  PackageCheck,
   Loader2,
   X,
 } from 'lucide-react';
@@ -52,7 +53,9 @@ export function UnifiedChatHeader({
   canToggleAi = true,
 }: UnifiedChatHeaderProps) {
   const [isUpdating, setIsUpdating] = useState(false);
-  const [confirm, setConfirm] = useState<null | 'pause' | 'payment'>(null);
+  const [confirm, setConfirm] = useState<null | 'pause' | 'payment' | 'delivery'>(null);
+  const [deliveries, setDeliveries] = useState<SupplierOrder[]>([]);
+  const [deliveryPick, setDeliveryPick] = useState('');
   const [order, setOrder] = useState<PendingOrder | null>(null);
   const contact = conversation.contact;
   const isEmail = conversation.channel === 'email';
@@ -75,6 +78,24 @@ export function UnifiedChatHeader({
       live = false;
     };
   }, [conversation.id, conversation.mode, canToggleAi, isSupplier]);
+
+  // Supplier orders waiting for delivery (for the Order delivered button).
+  useEffect(() => {
+    let live = true;
+    setDeliveries([]);
+    if (!canToggleAi || !isSupplier) return;
+    fetch(`/api/conversations/${conversation.id}/delivery`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!live) return;
+        setDeliveries(d?.orders || []);
+        setDeliveryPick(d?.orders?.[0]?.request_id || '');
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [conversation.id, canToggleAi, isSupplier, confirm]);
 
   // One click: Human → AI right away. AI → Human asks the owner's password first (a manual pause stays until the owner resumes).
   const handleSwitch = async () => {
@@ -177,6 +198,19 @@ export function UnifiedChatHeader({
             </button>
           )}
 
+          {/* Supplier delivered the order: stock into Inventory, thank the supplier, follow up the customer */}
+          {canToggleAi && isSupplier && (
+            <button
+              disabled={isUpdating}
+              onClick={() => setConfirm('delivery')}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition-all"
+              title={deliveries.length ? 'Mark the order delivered: Inventory is updated, the supplier is thanked and the customer gets a follow-up' : 'No order waiting for delivery from this supplier'}
+            >
+              <PackageCheck className="w-3.5 h-3.5" />
+              <span>{deliveries.length === 1 ? `Order delivered · ${deliveries[0].request_id}` : 'Order delivered'}</span>
+            </button>
+          )}
+
           {/* One-click switch: AI Responding ⇄ Human Responding */}
           {canToggleAi && (
             <button
@@ -232,6 +266,50 @@ export function UnifiedChatHeader({
           }}
         />
       )}
+      {confirm === 'delivery' && !deliveries.length && (
+        <InfoDialog
+          title="No order waiting for delivery"
+          text={`${displayName} has no order waiting for delivery. An order waits for delivery after you select this supplier's quote.`}
+          onClose={() => setConfirm(null)}
+        />
+      )}
+      {confirm === 'delivery' && deliveries.length > 0 && (
+        <PasswordDialog
+          title="Order delivered?"
+          text={`Same as writing "DELIVERED ${deliveryPick}" on WhatsApp: the stock is added to Inventory, ${displayName} is thanked in their language and the customer who asked for it gets a follow-up.`}
+          details={
+            <div className="space-y-1.5">
+              {deliveries.map((d) => (
+                <label key={d.request_id} className={`flex gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer ${deliveryPick === d.request_id ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                  <input type="radio" name="delivery" className="mt-0.5" checked={deliveryPick === d.request_id} onChange={() => setDeliveryPick(d.request_id)} />
+                  <span className="min-w-0">
+                    <span className="font-semibold text-slate-800">{d.request_id}</span>
+                    <span className="block text-slate-600 truncate">{d.product || '-'}</span>
+                    <span className="block text-slate-500">
+                      {d.quantity ? `${d.quantity} pcs` : ''}
+                      {d.price ? ` · ${d.currency} ${d.price} each` : ''}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          }
+          confirmLabel="Confirm delivery"
+          tone="green"
+          onClose={() => setConfirm(null)}
+          onConfirm={async (password) => {
+            const res = await fetch(`/api/conversations/${conversation.id}/delivery`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ request_id: deliveryPick, password }),
+            });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.error || `Failed (${res.status})`);
+            setConfirm(null);
+            await onPaymentVerified?.();
+          }}
+        />
+      )}
       {confirm === 'payment' && !order && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 px-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirm(null)}>
           <div role="dialog" aria-modal="true" aria-label="No unpaid order" className="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-5 space-y-3">
@@ -280,6 +358,32 @@ export function UnifiedChatHeader({
           }}
         />
       )}
+    </div>
+  );
+}
+
+interface SupplierOrder {
+  request_id: string;
+  supplier_id: string;
+  product: string;
+  quantity: string;
+  price: string;
+  currency: string;
+  status: string;
+}
+
+function InfoDialog({ title, text, onClose }: { title: string; text: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 px-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={title} className="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-5 space-y-3">
+        <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+        <p className="text-xs text-slate-600 leading-relaxed">{text}</p>
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-900">
+            OK
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
