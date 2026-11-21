@@ -165,15 +165,15 @@ export function UnifiedChatHeader({
           )}
 
           {/* Verify payment of the current order (owner's password) */}
-          {canToggleAi && order && (
+          {canToggleAi && !isSupplier && (
             <button
               disabled={isUpdating}
               onClick={() => setConfirm('payment')}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition-all"
-              title={`Mark ${order.order_no} as paid, turn the AI back on and thank the customer`}
+              title={order ? `Mark ${order.order_no} as paid, turn the AI back on and thank the customer` : 'No unpaid order for this customer yet'}
             >
               <CreditCard className="w-3.5 h-3.5" />
-              <span>Verify payment · {order.order_no}</span>
+              <span>{order ? `Verify payment · ${order.order_no}` : 'Verify payment'}</span>
             </button>
           )}
 
@@ -231,6 +231,21 @@ export function UnifiedChatHeader({
             setConfirm(null);
           }}
         />
+      )}
+      {confirm === 'payment' && !order && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 px-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirm(null)}>
+          <div role="dialog" aria-modal="true" aria-label="No unpaid order" className="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-5 space-y-3">
+            <h3 className="text-sm font-bold text-slate-900">No unpaid order</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              {displayName} has no order waiting for payment yet. When the AI confirms an order (ORD-…) for this customer, it shows here and you can verify its payment.
+            </p>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setConfirm(null)} className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-900">
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {confirm === 'payment' && order && (
         <PasswordDialog
